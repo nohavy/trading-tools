@@ -41,10 +41,10 @@ class ZScoreIncr:
         n = len(self._values)
         mean = sum(self._values) / n
         variance = sum((v - mean) ** 2 for v in self._values) / n
-        std = variance**0.5
+        std = float(variance**0.5)
         if std == 0.0:
             return None
-        return (x - mean) / std
+        return float((x - mean) / std)
 
 
 class VwapIncr:
@@ -63,7 +63,7 @@ class VwapIncr:
             self._cv = 0.0
         self._pv += price * volume
         self._cv += volume
-        return self._pv / self._cv if self._cv > 0 else None
+        return float(self._pv / self._cv) if self._cv > 0 else None
 
 
 class RealizedVolIncr:
@@ -87,7 +87,7 @@ class RealizedVolIncr:
         n = len(self._returns)
         mean = sum(self._returns) / n
         variance = sum((r - mean) ** 2 for r in self._returns) / n
-        return variance**0.5
+        return float(variance**0.5)
 
 
 class FlowImbalanceIncr:
@@ -109,4 +109,4 @@ class FlowImbalanceIncr:
         buy = sum(self._buy)
         if total == 0:
             return None
-        return 2 * buy / total - 1
+        return float(2 * buy / total - 1)
