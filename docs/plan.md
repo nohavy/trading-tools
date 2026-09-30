@@ -85,8 +85,8 @@ src/tradingv2/
 | 001 | 0+1 | Socle (uv, CLI `tv2`, config YAML) + données (téléchargement vérifié, Parquet ns, catalogue, `data check`, exchangeInfo, funding, resample) |
 | 002 | 2 | Moteur : types, boucle d'événements, exchange simulé, coûts, comptes Spot/Perp, API Strategy |
 | 003 | 3 | Features (parité), stratégies de base, métriques, rapport HTML, `tv2 compare` |
-| 004 | 4 | Étude d'edge, sweeps/Optuna, walk-forward, Monte Carlo, stress, holdout, verdict go/no-go |
-| — | 5-7 | Temps réel, paper trading, live (testnet puis réel) |
+| 004 | 4 | Étude d'edge, sweeps, walk-forward, Monte Carlo, stress, régimes, holdout compté, verdict go/no-go |
+| — | 5-7 | Temps réel (websocket, signaux, alertes), paper trading, live (testnet puis réel) |
 
 **Go/no-go phase 4** (sur données non utilisées pour l'optimisation) : ≥ 300 trades OOS ; expectancy net positive et significative ; profit factor net ≥ 1,2 ; ≥ 70 % des fenêtres walk-forward positives ; résiste au stress (frais ×1,5, slippage ×2, latence +250 ms) ; drawdown < seuil.
 

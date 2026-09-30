@@ -1,0 +1,28 @@
+data:
+  market: spot
+  kind: klines
+  symbol: BTCUSDT
+  interval: 1s
+  start: 2026-08-01
+  end: 2026-08-31
+  tape: aggTrades
+account:
+  type: margin
+  balance: 1000
+  leverage: 5
+costs:
+  maker_bps: 2
+  taker_bps: 5
+  slippage_bps: 0.5
+  latency:
+    mean_ms: 150
+    jitter_ms: 50
+    seed: 42
+strategy:
+  name: meanrev_zscore
+  params:
+    window: 120
+    entry_z: 2.5
+    exit_z: 0.5
+    qty: 0.002
+    max_hold_bars: 300

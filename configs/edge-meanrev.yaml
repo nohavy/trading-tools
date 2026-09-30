@@ -1,0 +1,19 @@
+data:
+  market: spot
+  kind: klines
+  symbol: BTCUSDT
+  interval: 1s
+  start: 2026-08-01
+  end: 2026-08-31
+signal:
+  name: meanrev
+  window: 120
+  entry_z: 2.5
+horizons_s: [1, 5, 15, 30, 60, 300, 900]
+cost_pairs:
+  - name: spot_taker_market
+    maker_bps: 10
+    taker_bps: 10
+  - name: um_maker_market
+    maker_bps: 2
+    taker_bps: 5

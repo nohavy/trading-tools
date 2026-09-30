@@ -13,6 +13,15 @@ Références : `.specify/memory/constitution.md` (principes — prime sur tout) 
 - `uv run mypy` — vérification des types
 - `uv run tv2 --help` — CLI du projet
 
+## Usage validation (feature 004)
+
+- `uv run tv2 research edge --config configs/edge-meanrev.yaml` — rendements après signal vs coûts, par horizon (filtre pré-backtest).
+- `uv run tv2 backtest sweep --config configs/backtest.yaml --grid "window=60..300:60"` — grille en parallèle, classement par espérance nette, heatmap.
+- `uv run tv2 backtest walkforward --config ... --grid ... --train-bars N --test-bars M` — folds chronologiques, agrégat OOS, % folds positifs.
+- `uv run tv2 backtest monte-carlo runs/<id> --sims 1000` — percentiles du PnL final, proba de drawdown.
+- `uv run tv2 backtest stress --config ...` — frais ×1,5 / slippage ×2 / latence +250 ms / combiné.
+- `uv run tv2 validate run runs/<id>` — verdict go/no-go (7 critères) ; compteur d'essais holdout dans `data/holdout_attempts.json`.
+
 ## Usage données (feature 001)
 
 - `uv run tv2 data download --config configs/reference.yaml` — télécharge + convertit (Parquet ns) + catalogue (`data/catalog.json`) ; idempotent.
