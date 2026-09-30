@@ -8,7 +8,7 @@ sequence number breaking ties deterministically.
 import heapq
 from dataclasses import dataclass, field
 
-from tradingv2.core.types import PriceBar
+from tradingv2.core.types import Order, PriceBar
 from tradingv2.execution.exchange import FillEvent, SimulatedExchange
 from tradingv2.strategy.base import Context, Strategy
 
@@ -21,6 +21,7 @@ class EngineResult:
     fill_events: list[FillEvent] = field(default_factory=list)
     equity_curve: list[tuple[int, float]] = field(default_factory=list)
     final_equity: float = 0.0
+    orders: list[Order] = field(default_factory=list)
 
 
 @dataclass(order=True)
@@ -114,4 +115,5 @@ class Engine:
             fill_events=self._fill_events,
             equity_curve=self._equity_curve,
             final_equity=self.exchange.account.equity(final_mark),
+            orders=list(self.exchange._orders.values()),
         )
