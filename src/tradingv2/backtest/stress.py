@@ -1,7 +1,6 @@
 """Cost stress scenarios: replay the same run with degraded costs only."""
 
 import json
-
 from dataclasses import dataclass
 from pathlib import Path
 

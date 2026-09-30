@@ -63,7 +63,8 @@ def test_stress_modifies_costs_only(tmp_path: Path) -> None:
     def normalize(d: dict[str, object], reference: dict[str, object]) -> dict[str, object]:
         # only reference keys: defaults added by the model dump are ignored
         subset = {k: d[k] for k in reference if k in d and d[k] is not None}
-        return json.loads(json.dumps(subset, default=str))
+        out: dict[str, object] = json.loads(json.dumps(subset, default=str))
+        return out
     for scenario_result in results:
         variant = yaml.safe_load(
             (scenario_result.run_dir / "config.yaml").read_text(encoding="utf-8")
