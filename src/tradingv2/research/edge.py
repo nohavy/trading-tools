@@ -215,3 +215,58 @@ def run_edge_study(config_path: Path, data_root: Path, runs_root: Path) -> Path:
     }
     out.write_text(json.dumps(payload, indent=2), encoding="utf-8")
     return out
+
+
+def session_labels(event_ts: np.ndarray) -> list[str]:
+    """UTC session buckets: 0-8 (Asia), 8-16 (Europe), 16-24 (US)."""
+    hour = (event_ts // 1_000_000_000 // 3600) % 24
+    return ["0-8" if h < 8 else ("8-16" if h < 16 else "16-24") for h in hour]
+
+
+def vol_regime_labels(ts: np.ndarray, close: np.ndarray, window: int) -> list[str]:
+    """High/low volatility labels per bar: above/below the series median vol.
+
+    Vol = std of simple returns over `window` bars (rolling, population).
+    Undefined (window not full) bars get the label of the last defined value.
+    """
+    if len(close) < 2:
+        return ["low"] * len(ts)
+    returns = np.diff(close) / close[:-1]
+    vols = np.full(len(close), np.nan)
+    if len(returns) >= window:
+        windows = np.lib.stride_tricks.sliding_window_view(returns, window)
+        vols[window:] = windows.std(axis=1)
+    defined = vols[~np.isnan(vols)]
+    median = float(np.median(defined)) if defined.size else 0.0
+    labels: list[str] = []
+    last = "low"
+    for value in vols:
+        if value != value:
+            labels.append(last)
+            continue
+        last = "high" if value > median else "low"
+        labels.append(last)
+    return labels
+
+
+def edge_by_regime(
+    events: list[SignalEvent],
+    ts: np.ndarray,
+    close: np.ndarray,
+    horizons_ns: list[int],
+    cost_pairs: list[tuple[str, float]],
+    label_fn,
+) -> dict[str, list[dict[str, object]]]:
+    """Edge table per regime: events grouped by label_fn(event_ts).
+
+    Returns {label: edge_table rows for the events of that label}. Labels with
+    no events are absent from the result.
+    """
+    groups: dict[str, list[SignalEvent]] = {}
+    for event in events:
+        label = label_fn(event.ts_ns)
+        groups.setdefault(label, []).append(event)
+    return {
+        label: edge_table(group, ts, close, horizons_ns, cost_pairs)
+        for label, group in sorted(groups.items())
+    }
