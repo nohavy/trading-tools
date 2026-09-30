@@ -5,10 +5,13 @@ from datetime import date
 from pathlib import Path
 from typing import Annotated
 
+import polars as pl
 import typer
 
-from tradingv2.config import ConfigError, load_config
+from tradingv2.config import ConfigError, DataKind, load_config
+from tradingv2.data.convert import parse_interval_ns
 from tradingv2.data.pipeline import run_download_pipeline
+from tradingv2.data.quality import Anomaly, check_bars
 
 DATA_ROOT = Path("data")
 
@@ -57,9 +60,38 @@ def data_download(
 
 
 @data_app.command("check")
-def data_check(config: Annotated[Path, typer.Option(help="YAML configuration file")]) -> None:
-    """Report data quality anomalies for a downloaded dataset."""
-    typer.echo("not implemented yet")
+def data_check(
+    config: Annotated[Path, typer.Option(help="YAML configuration file")],
+    data_root: Annotated[Path, typer.Option(help="Data root directory")] = DATA_ROOT,
+) -> None:
+    """Report data quality anomalies for downloaded bar data."""
+
+    def action() -> None:
+        cfg = load_config(config)
+        if cfg.data.kind != DataKind.KLINES:
+            typer.echo("quality check currently supports klines only", err=True)
+            raise typer.Exit(code=2)
+        market_dir = cfg.data.market.value
+        interval = cfg.data.interval
+        directory = data_root / "parquet" / market_dir / "klines" / cfg.data.symbol / interval
+        files = sorted(directory.glob("*.parquet")) if directory.is_dir() else []
+        if not files:
+            typer.echo(f"no parquet files under {directory}", err=True)
+            raise typer.Exit(code=2)
+        interval_ns = parse_interval_ns(cfg.data.interval or "")
+        anomalies: list[Anomaly] = []
+        for path in files:
+            anomalies.extend(check_bars(pl.read_parquet(path), interval_ns))
+        if not anomalies:
+            typer.echo(f"clean: {len(files)} file(s), no anomalies")
+            return
+        for anomaly in anomalies[:50]:
+            typer.echo(f"{anomaly.kind.value} at ts={anomaly.ts_ns}: {anomaly.detail}")
+        if len(anomalies) > 50:
+            typer.echo(f"... and {len(anomalies) - 50} more")
+        raise typer.Exit(code=1)
+
+    _run_or_exit(action)
 
 
 @data_app.command("instruments")
