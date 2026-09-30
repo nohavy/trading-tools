@@ -136,6 +136,8 @@ class SimulatedExchange:
                 continue
             if scheduled.order.type == OrderType.MARKET:
                 event = self._execute_market(scheduled)
+            elif scheduled.order.type == OrderType.STOP_MARKET:
+                event = self._execute_stop(scheduled)
             else:
                 event = self._execute_limit(scheduled)
             if event is not None:
@@ -150,11 +152,16 @@ class SimulatedExchange:
     def _activate(self, order: Order) -> None:
         price = self._reference_price()
         original_qty = order.qty
-        if order.type != OrderType.MARKET:
+        if order.type == OrderType.LIMIT:
             assert order.limit_price is not None
             order.limit_price = round_price_to_tick(order.limit_price, self.rules.tick_size)
         order.qty = round_qty_to_step(order.qty, self.rules.step_size)
-        check_price = order.limit_price if order.type == OrderType.LIMIT else price
+        if order.type == OrderType.LIMIT:
+            check_price = order.limit_price
+        elif order.type == OrderType.STOP_MARKET:
+            check_price = order.stop_price
+        else:
+            check_price = price
         if check_price is None:
             order.transition(OrderStatus.REJECTED)
             order.reject_reason = "no reference price for market order validation"
@@ -184,6 +191,8 @@ class SimulatedExchange:
         order.transition(OrderStatus.ACTIVE)
         if order.type == OrderType.MARKET:
             self._schedule_market(order)
+        elif order.type == OrderType.STOP_MARKET:
+            self._schedule_stop(order)
         else:
             self._schedule_limit(order)
 
@@ -349,3 +358,52 @@ class SimulatedExchange:
         self.account.apply_fill(fill)
         self.last_price = market_price
         return FillEvent(fill=fill, realized_gross=realized, slippage_cost=0.0)
+
+    # -- stop fills on the tape ----------------------------------------------
+
+    def _schedule_stop(self, order: Order) -> None:
+        assert self._tape_ts is not None
+        assert self._tape_price is not None
+        assert order.arrive_ns is not None
+        assert order.stop_price is not None
+        lo = int(np.searchsorted(self._tape_ts, order.arrive_ns, side="left"))
+        first: int | None = None
+        if lo < len(self._tape_ts):
+            prices = self._tape_price[lo:]
+            mask = (
+                prices >= order.stop_price if order.side == Side.BUY else prices <= order.stop_price
+            )
+            indices = np.nonzero(mask)[0]
+            if indices.size > 0:
+                first = lo + int(indices[0])
+        if first is None:
+            return  # rests until the stop level trades
+        reference = self._reference_price()
+        self._seq += 1
+        scheduled = _ScheduledFill(order, first, order.qty, reference)
+        heappush(self._scheduled, (int(self._tape_ts[first]), self._seq, scheduled))
+
+    def _execute_stop(self, scheduled: _ScheduledFill) -> FillEvent | None:
+        assert self._tape_price is not None
+        order = scheduled.order
+        trigger_price = float(self._tape_price[scheduled.start_idx])
+        notional = order.qty * trigger_price
+        fee = self.fees.fee("taker", notional)
+        fill = Fill(
+            order_id=order.id,
+            ts_ns=int(self._tape_ts[scheduled.start_idx]),
+            price=trigger_price,
+            qty=order.qty,
+            fee=fee,
+            role=FillRole.TAKER,
+            side=order.side,
+        )
+        order.transition(OrderStatus.FILLED)
+        signed = fill.qty if order.side == Side.BUY else -fill.qty
+        realized = self._tracker.apply(signed, trigger_price)
+        self.account.apply_fill(fill)
+        slippage = self._slippage_cost(
+            scheduled.reference_price, trigger_price, order.qty, order.side
+        )
+        self.last_price = trigger_price
+        return FillEvent(fill=fill, realized_gross=realized, slippage_cost=slippage)
