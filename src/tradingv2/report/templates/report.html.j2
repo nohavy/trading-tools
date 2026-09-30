@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>tradingv2 — {{ strategy_name }} {{ symbol }}</title>
+<style>
+body { font-family: system-ui, sans-serif; margin: 24px; color: #111; background: #fafafa; }
+h1 { font-size: 20px; } h2 { font-size: 16px; margin-top: 24px; }
+table { border-collapse: collapse; margin: 8px 0; }
+td, th { border: 1px solid #ddd; padding: 4px 10px; font-size: 14px; }
+th { background: #eee; text-align: left; }
+.note { color: #555; font-size: 13px; }
+.zero { color: #b45309; font-weight: bold; }
+svg { border: 1px solid #e5e5e5; background: #fff; margin: 4px 0; }
+.meta { font-size: 13px; color: #444; }
+</style>
+</head>
+<body>
+<h1>Run — {{ strategy_name }} <span class="meta">({{ symbol }} · {{ market }} · {{ interval }} · {{ period }})</span></h1>
+<p class="meta">{{ n_bars }} barres · {{ n_fills }} fills · équité finale {{ final_equity }}</p>
+
+<h2>Métriques</h2>
+<table>
+<tr><th></th><th>Valeur</th></tr>
+<tr><td>Rendement total</td><td>{{ fmt(metrics.total_return * 100 if metrics.total_return is not none else none, ' %') }}</td></tr>
+<tr><td>Sharpe (365 j)</td><td>{{ fmt(metrics.sharpe) }}</td></tr>
+<tr><td>Sortino (365 j)</td><td>{{ fmt(metrics.sortino) }}</td></tr>
+<tr><td>Drawdown maximal</td><td>{{ fmt(metrics.max_drawdown * 100 if metrics.max_drawdown is not none else none, ' %') }}</td></tr>
+<tr><td>Calmar</td><td>{{ fmt(metrics.calmar) }}</td></tr>
+<tr><td>t-stat espérance</td><td>{{ fmt(metrics.t_stat) }}</td></tr>
+</table>
+
+<h2>Trades</h2>
+{% if has_trades %}
+<table>
+<tr><th></th><th>Valeur</th></tr>
+<tr><td>Nombre</td><td>{{ metrics.n_trades }}</td></tr>
+<tr><td>Taux de réussite</td><td>{{ fmt(metrics.win_rate * 100 if metrics.win_rate is not none else none, ' %') }}</td></tr>
+<tr><td>Gain moyen</td><td>{{ fmt(metrics.avg_win) }}</td></tr>
+<tr><td>Perte moyenne</td><td>{{ fmt(metrics.avg_loss) }}</td></tr>
+<tr><td>Payoff</td><td>{{ fmt(metrics.payoff) }}</td></tr>
+<tr><td>Profit factor</td><td>{{ fmt(metrics.profit_factor) }}</td></tr>
+<tr><td>Espérance nette</td><td>{{ fmt(metrics.expectancy_bps) }} bps</td></tr>
+<tr><td>Détention moyenne</td><td>{{ fmt((metrics.avg_hold_ns / 1e9) if metrics.avg_hold_ns is not none else none) }} s</td></tr>
+</table>
+
+<h2>Coûts (net de frais)</h2>
+<table>
+<tr><th></th><th>Total</th></tr>
+<tr><td>Brut</td><td>{{ fmt(metrics.gross_total) }}</td></tr>
+<tr><td>Frais</td><td>{{ fmt(metrics.fees_total) }}</td></tr>
+<tr><td>Slippage</td><td>{{ fmt(metrics.slippage_total) }}</td></tr>
+<tr><td>Funding</td><td>{{ fmt(metrics.funding_total) }}</td></tr>
+<tr><td><b>Net</b></td><td><b>{{ fmt(metrics.net_total) }}</b></td></tr>
+<tr><td>Drag des frais (frais/brut)</td><td>{{ fmt(metrics.fee_drag * 100 if metrics.fee_drag is not none else none, ' %') }}</td></tr>
+</table>
+
+<h2>Équité</h2>
+{{ svg_equity | safe }}
+<h2>Drawdown</h2>
+{{ svg_drawdown | safe }}
+<h2>Gain net par trade</h2>
+{{ svg_hist | safe }}
+{% else %}
+<p class="zero">Aucun trade sur cette période.</p>
+<h2>Équité</h2>
+{{ svg_equity | safe }}
+{% endif %}
+</body>
+</html>
