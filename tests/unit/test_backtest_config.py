@@ -43,7 +43,7 @@ def write(tmp_path: Path, content: str) -> Path:
 def test_load_full_config(tmp_path: Path) -> None:
     cfg = load_backtest_config(write(tmp_path, VALID))
     assert isinstance(cfg, BacktestConfig)
-    assert cfg.data.market.value == "um"
+    assert cfg.data.market == "um"
     assert cfg.data.tape == "aggTrades"
     assert cfg.account.type == "margin"
     assert cfg.account.balance == 1000.0
