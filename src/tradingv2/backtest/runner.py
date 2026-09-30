@@ -4,6 +4,7 @@ from datetime import UTC, date, datetime
 from pathlib import Path
 
 import polars as pl
+import yaml
 
 from tradingv2.backtest.config import BacktestConfig, load_backtest_config
 from tradingv2.backtest.engine import Engine, EngineResult
@@ -198,7 +199,7 @@ def _record(
     run_dir = runs_root / f"{stamp}-{cfg.strategy.name}"
     run_dir.mkdir(parents=True, exist_ok=True)
     (run_dir / "config.yaml").write_text(
-        cfg.model_dump_json(indent=2), encoding="utf-8"
+        yaml.safe_dump(cfg.model_dump(mode="json"), sort_keys=False), encoding="utf-8"
     )
     trades = pl.DataFrame(
         {

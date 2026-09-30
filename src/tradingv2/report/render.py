@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 
 import polars as pl
+import yaml
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 _TEMPLATE_DIR = Path(__file__).parent / "templates"
@@ -92,7 +93,7 @@ def _fmt(value: float | None, suffix: str = "") -> str:
 
 def render_report(run_dir: Path) -> Path:
     """Render the standalone report.html inside a run directory."""
-    config = json.loads((run_dir / "config.yaml").read_text(encoding="utf-8"))
+    config = yaml.safe_load((run_dir / "config.yaml").read_text(encoding="utf-8"))
     summary = json.loads((run_dir / "summary.json").read_text(encoding="utf-8"))
     metrics = json.loads((run_dir / "metrics.json").read_text(encoding="utf-8"))
     trades_path = run_dir / "trades.csv"
