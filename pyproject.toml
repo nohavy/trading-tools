@@ -39,6 +39,7 @@ packages = ["src/tradingv2"]
 testpaths = ["tests"]
 markers = [
     "net: tests requiring network access (deselect with -m 'not net')",
+    "slow: long-running benchmarks (deselect with -m 'not slow')",
 ]
 
 [tool.ruff]
