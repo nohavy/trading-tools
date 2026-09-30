@@ -4,9 +4,13 @@ from datetime import date
 from pathlib import Path
 
 import polars as pl
+import pytest
 
 from tradingv2.backtest.config import BacktestConfig, DataSpec
 from tradingv2.backtest.runner import _load_bars
+from typing import Any
+
+import tradingv2.backtest.runner as runner
 
 
 def make_env(tmp_path: Path) -> tuple[Path, BacktestConfig]:
@@ -54,19 +58,22 @@ def make_env(tmp_path: Path) -> tuple[Path, BacktestConfig]:
     return tmp_path, cfg
 
 
-def test_bounds_skip_out_of_range_files(tmp_path: Path, monkeypatch) -> None:
-    """A narrow march window must not read the january file at all."""
-    data_root, cfg = make_env(tmp_path)
-    import tradingv2.backtest.runner as runner
-
+def _spy_reads(monkeypatch: pytest.MonkeyPatch) -> list[str]:
     reads: list[str] = []
-    original = pl.read_parquet
+    original = runner.pl.read_parquet
 
-    def spy(path: object, *args: object, **kwargs: object) -> pl.DataFrame:
+    def spy(path: Any, *args: Any, **kwargs: Any) -> pl.DataFrame:
         reads.append(Path(str(path)).name)
-        return original(path, *args, **kwargs)  # type: ignore[arg-type]
+        return original(path, *args, **kwargs)
 
     monkeypatch.setattr(runner.pl, "read_parquet", spy)
+    return reads
+
+
+def test_bounds_skip_out_of_range_files(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """A narrow march window must not read the january file at all."""
+    data_root, cfg = make_env(tmp_path)
+    reads = _spy_reads(monkeypatch)
     march_start = int((date(2020, 3, 1) - date(1970, 1, 1)).total_seconds() * 1_000_000_000)
     march_end = int((date(2020, 4, 1) - date(1970, 1, 1)).total_seconds() * 1_000_000_000)
     bars = _load_bars(cfg, data_root, bar_bounds=(march_start, march_end))
@@ -74,18 +81,9 @@ def test_bounds_skip_out_of_range_files(tmp_path: Path, monkeypatch) -> None:
     assert all("2020-01" not in name for name in reads), f"january was read: {reads}"
 
 
-def test_no_bounds_reads_all(tmp_path: Path, monkeypatch) -> None:
+def test_no_bounds_reads_all(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     data_root, cfg = make_env(tmp_path)
-    import tradingv2.backtest.runner as runner
-
-    reads: list[str] = []
-    original = pl.read_parquet
-
-    def spy(path: object, *args: object, **kwargs: object) -> pl.DataFrame:
-        reads.append(Path(str(path)).name)
-        return original(path, *args, **kwargs)  # type: ignore[arg-type]
-
-    monkeypatch.setattr(runner.pl, "read_parquet", spy)
+    reads = _spy_reads(monkeypatch)
     bars = _load_bars(cfg, data_root, bar_bounds=None)
     assert bars
     assert len(reads) == 2
