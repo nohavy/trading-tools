@@ -5,11 +5,17 @@ from datetime import date
 from pathlib import Path
 from typing import Annotated
 
+import httpx
 import polars as pl
 import typer
 
-from tradingv2.config import ConfigError, DataKind, load_config
+from tradingv2.config import ConfigError, DataKind, Market, load_config
 from tradingv2.data.convert import parse_interval_ns
+from tradingv2.data.instruments import (
+    extract_instrument_rules,
+    fetch_exchange_info,
+    save_instrument_rules,
+)
 from tradingv2.data.pipeline import run_download_pipeline
 from tradingv2.data.quality import Anomaly, check_bars
 
@@ -99,9 +105,26 @@ def data_check(
 def data_instruments(
     market: Annotated[str, typer.Option(help="Market: spot|um")],
     symbol: Annotated[str, typer.Option(help="Symbol, e.g. BTCUSDT")],
+    data_root: Annotated[Path, typer.Option(help="Data root directory")] = DATA_ROOT,
 ) -> None:
     """Fetch and store exchange trading rules for a symbol."""
-    typer.echo("not implemented yet")
+
+    def action() -> None:
+        try:
+            market_kind = Market(market)
+        except ValueError:
+            typer.echo(f"invalid market '{market}': expected spot|um", err=True)
+            raise typer.Exit(code=2) from None
+        with httpx.Client(timeout=30.0) as client:
+            raw = fetch_exchange_info(market_kind, client)
+        rules = extract_instrument_rules(market_kind, raw, symbol)
+        path = save_instrument_rules(rules, data_root)
+        typer.echo(
+            f"{rules.symbol} ({rules.market.value}): tick_size={rules.tick_size} "
+            f"step_size={rules.step_size} min_notional={rules.min_notional} -> {path}"
+        )
+
+    _run_or_exit(action)
 
 
 def main() -> None:

@@ -30,6 +30,28 @@ def test_cli_download_reports_missing_config(tmp_path: Path) -> None:
     assert "not found" in result.output
 
 
+def test_cli_instruments_invalid_market_exits_two(tmp_path: Path) -> None:
+    result = runner.invoke(
+        app,
+        [
+            "data",
+            "instruments",
+            "--market",
+            "binance",
+            "--symbol",
+            "BTCUSDT",
+            "--data-root",
+            str(tmp_path),
+        ],
+    )
+    assert result.exit_code == 2
+
+
+def test_cli_instruments_requires_options() -> None:
+    result = runner.invoke(app, ["data", "instruments"])
+    assert result.exit_code != 0
+
+
 def test_cli_check_clean_dataset_exits_zero(tmp_path: Path) -> None:
     _write_bars(tmp_path, clean=True)
     result = _invoke_check(tmp_path)
