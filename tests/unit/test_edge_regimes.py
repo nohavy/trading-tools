@@ -20,7 +20,7 @@ def test_edge_by_session_labels() -> None:
     """Events labeled by UTC hour bucket: stats per bucket are consistent."""
     n = 25 * 3600 + 1  # 25 hours
     ts = np.arange(n, dtype=np.int64) * S
-    close = 100.0 * np.power(1.01, np.arange(n, dtype=np.float64))  # +1%/s: 100 bps everywhere
+    close = 100.0 * np.power(1.0001, np.arange(n, dtype=np.float64))  # +1bp/s everywhere
     # buy events in sessions 0-8, 8-16, 16-24 (hours 0, 10, 20)
     events = [
         SignalEvent(ts_ns=0, direction="buy"),
@@ -35,10 +35,11 @@ def test_edge_by_session_labels() -> None:
     for _label, label_rows in rows.items():
         assert len(label_rows) == 1
         row = label_rows[0]
+        assert isinstance(row, dict)
         assert row["n"] == 1
         assert row["mean_bps"] is not None
-        assert row["mean_bps"] == pytest.approx(100.0)  # +1/100 up drift everywhere
-        assert row["edges"]["c"] == pytest.approx(50.0)
+        assert row["mean_bps"] == pytest.approx(1.0)  # +1 bp/s drift everywhere
+        assert row["edges"]["c"] == pytest.approx(1.0 - 50.0)
 
 
 def test_edge_by_regime_splits_statistics() -> None:
