@@ -53,3 +53,7 @@ select = ["E", "F", "W", "I", "UP", "B"]
 python_version = "3.12"
 strict = true
 files = ["src/tradingv2", "tests"]
+
+[[tool.mypy.overrides]]
+module = "pyarrow.*"
+ignore_missing_imports = true
