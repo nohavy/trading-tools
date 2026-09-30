@@ -7,6 +7,8 @@ not worth a backtest.
 
 import numpy as np
 
+from tradingv2.research.signals import SignalEvent
+
 
 def forward_returns(
     ts: np.ndarray,
@@ -64,17 +66,17 @@ def _excursions(
 
 
 def edge_table(
-    events: list,  # list[SignalEvent]
+    events: list[SignalEvent],
     ts: np.ndarray,
     close: np.ndarray,
     horizons_ns: list[int],
     cost_pairs: list[tuple[str, float]],
-) -> list[dict]:
+) -> list[dict[str, object]]:
     """Rows per horizon: n, mean/median bps, hit rate, excursions, edges vs costs.
 
     edges = {cost_pair_name: mean_bps - round_trip_bps} (None without data).
     """
-    rows: list[dict] = []
+    rows: list[dict[str, object]] = []
     for horizon in horizons_ns:
         rets: list[float] = []
         mfes: list[float] = []

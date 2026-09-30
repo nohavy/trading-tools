@@ -66,9 +66,8 @@ def test_sweep_runs_all_combinations_ranked(tmp_path: Path) -> None:
     result = sweep_grid(cfg, {"hold_bars": [2, 4]}, data_root=data_root, runs_root=runs, workers=2)
     assert len(result.entries) == 2
     expectancies = [e.expectancy_bps for e in result.entries]
-    assert expectancies == sorted(expectancies, reverse=True) or all(
-        e is None for e in expectancies
-    )
+    defined = [e for e in expectancies if e is not None]
+    assert defined == sorted(defined, reverse=True)
     for entry in result.entries:
         assert isinstance(entry, SweepEntry)
         assert entry.run_dir.is_dir()

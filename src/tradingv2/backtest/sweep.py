@@ -84,9 +84,9 @@ def parse_grid(grid_str: str) -> dict[str, list[float | int]]:
 
 def _run_one(
     index: int,
-    combo: tuple,
+    combo: tuple[float | int, ...],
     param_names: list[str],
-    base_config: dict,
+    base_config: dict[str, object],
     data_root: str,
     runs_root: str,
     min_trades: int,
