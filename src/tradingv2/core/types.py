@@ -110,6 +110,7 @@ class PriceBar:
     low: float
     close: float
     ts_close_ns: int
+    volume: float = 0.0
 
 
 @dataclass(frozen=True)

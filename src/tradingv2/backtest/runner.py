@@ -55,6 +55,7 @@ def _load_bars(cfg: BacktestConfig, data_root: Path) -> list[PriceBar]:
                     low=float(row["low"]),
                     close=float(row["close"]),
                     ts_close_ns=int(row["ts_open_ns"]) + interval_ns,
+                    volume=float(row["volume"]),
                 )
             )
     bars = [b for b in bars if lower_ns <= b.ts_close_ns <= upper_ns]

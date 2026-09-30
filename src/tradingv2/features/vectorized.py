@@ -9,8 +9,14 @@
   once `window` returns exist.
 - Flow imbalance: 2 * sum(taker_buy)/sum(volume) - 1 over the window, in
   [-1, 1], undefined when the window volume is zero.
+
+NOTE: polars rolling_sum uses a sliding add/remove accumulator that drifts on
+magnitude jumps (a [0, 0] window after 524288 returns ~5.8e-11, not 0) —
+flow_imbalance therefore uses direct per-window sums (numpy) so that the lot
+and incremental implementations agree bit-for-bit on realistic data.
 """
 
+import numpy as np
 import polars as pl
 
 
@@ -50,9 +56,20 @@ def realized_vol(close: pl.Series, window: int) -> pl.Series:
 
 
 def flow_imbalance(volume: pl.Series, taker_buy_volume: pl.Series, window: int) -> pl.Series:
-    """Taker-buy share over the window mapped to [-1, 1]."""
+    """Taker-buy share over the window mapped to [-1, 1] (exact window sums)."""
     if window <= 0:
         raise ValueError(f"window must be positive, got {window}")
-    total = volume.rolling_sum(window, min_samples=window)
-    buy = taker_buy_volume.rolling_sum(window, min_samples=window)
-    return 2 * buy / total - 1
+    v = volume.to_numpy()
+    b = taker_buy_volume.to_numpy()
+    n = len(v)
+    out = np.full(n, np.nan)
+    if n >= window:
+        windows_v = np.lib.stride_tricks.sliding_window_view(v, window)
+        windows_b = np.lib.stride_tricks.sliding_window_view(b, window)
+        total = windows_v.sum(axis=1)
+        buy = windows_b.sum(axis=1)
+        valid = total > 0
+        safe_total = np.where(valid, total, 1.0)
+        ratio = np.where(valid, buy / safe_total, 0.0)
+        out[window - 1 :] = np.where(valid, 2 * ratio - 1, np.nan)
+    return pl.Series(out)
