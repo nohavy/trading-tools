@@ -95,7 +95,8 @@ def test_second_order_scheduled_independently() -> None:
     events = exchange.advance_to(1_000 * MS)
     first_status: OrderStatus = first.status
     assert first_status == OrderStatus.CANCELED
-    assert second.status == OrderStatus.FILLED
+    second_status: OrderStatus = second.status
+    assert second_status == OrderStatus.FILLED
     assert len(events) == 1
     assert events[0].fill.price == pytest.approx(4999.9)
 
