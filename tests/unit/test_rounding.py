@@ -43,16 +43,19 @@ def test_order_values_pass() -> None:
 def test_order_qty_below_step_fails() -> None:
     ok, reason = order_values_pass_filters(0.0005, 84410.0, 0.001, 0.01, 5.0)
     assert not ok
+    assert reason is not None
     assert "step" in reason
 
 
 def test_order_notional_below_min_fails() -> None:
     ok, reason = order_values_pass_filters(0.00001, 84410.0, 0.00001, 0.01, 5.0)
     assert not ok
+    assert reason is not None
     assert "notional" in reason
 
 
 def test_order_zero_qty_fails() -> None:
     ok, reason = order_values_pass_filters(0.0, 84410.0, 0.001, 0.01, 5.0)
     assert not ok
+    assert reason is not None
     assert "qty" in reason
