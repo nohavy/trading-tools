@@ -7,7 +7,9 @@ not worth a backtest.
 
 import json
 from collections.abc import Callable
+from dataclasses import dataclass
 from datetime import UTC, date, datetime
+from itertools import product
 from pathlib import Path
 from typing import Any
 
@@ -271,3 +273,95 @@ def edge_by_regime(
         label: edge_table(group, ts, close, horizons_ns, cost_pairs)
         for label, group in sorted(groups.items())
     }
+
+
+@dataclass(frozen=True)
+class EdgeSweepEntry:
+    """One signal parameter combination scored by its raw forward edge."""
+
+    params: dict[str, float | int]
+    score_bps: float | None
+    n_events: int
+    few_events: bool
+    rows: list[dict[str, object]]
+
+
+@dataclass
+class EdgeSweepResult:
+    """Ranked edge sweep entries + HTML report path."""
+
+    entries: list[EdgeSweepEntry]
+    html_path: Path
+
+
+def edge_sweep(
+    config_path: Path,
+    grid: dict[str, list[float | int]],
+    *,
+    data_root: Path,
+    runs_root: Path,
+    target_horizon_s: int = 60,
+    min_events: int = 100,
+) -> EdgeSweepResult:
+    """Score every signal parameter combination by its raw forward edge.
+
+    The edge study is cheap (~seconds), so the grid is swept BEFORE any
+    backtest. Score = mean forward return (bps) at the target horizon.
+    Combinations without events (or below min_events) are flagged.
+    """
+    from tradingv2.backtest.sweep import _ENV as _sweep_env  # shared templates
+
+    base = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    bars = _load_bars(base, data_root)
+    if bars.is_empty():
+        raise FileNotFoundError("no bars in the configured period")
+    ts = bars["ts_open_ns"].to_numpy()
+    close = bars["close"].to_numpy()
+    horizons_ns = [int(h) * 1_000_000_000 for h in base.get("horizons_s", [1, 60])]
+    cost_pairs = [
+        (pair["name"], float(pair["maker_bps"]) + float(pair["taker_bps"]))
+        for pair in base.get("cost_pairs", [])
+    ]
+
+    param_names = list(grid.keys())
+    entries: list[EdgeSweepEntry] = []
+    for combo in product(*[grid[key] for key in param_names]):
+        params: dict[str, float | int] = dict(zip(param_names, combo, strict=True))
+        variant = yaml.safe_load(yaml.safe_dump(base))  # deep copy, dates kept
+        signal = dict(variant["signal"])
+        signal.update(params)
+        variant["signal"] = signal
+        events = _signal_events(variant, bars)
+        rows = edge_table(events, ts, close, horizons_ns, cost_pairs)
+        score = None
+        for row in rows:
+            if row["horizon_s"] == target_horizon_s:
+                score = row["mean_bps"]  # type: ignore[assignment]
+                break
+        entries.append(
+            EdgeSweepEntry(
+                params=params,
+                score_bps=score,
+                n_events=len(events),
+                few_events=len(events) < min_events,
+                rows=rows,
+            )
+        )
+    entries.sort(
+        key=lambda e: -(e.score_bps if e.score_bps is not None else float("-inf"))
+    )
+    runs_root.mkdir(parents=True, exist_ok=True)
+    stamp = datetime.now(UTC).strftime("%Y%m%d-%H%M%S")
+    html_path = runs_root / f"edge-sweep-{stamp}.html"
+    table_rows = [
+        {
+            "params": ", ".join(f"{k}={v}" for k, v in entry.params.items()),
+            "score": f"{entry.score_bps:.3f}" if entry.score_bps is not None else "n/a",
+            "n_events": entry.n_events,
+            "few": entry.few_events,
+        }
+        for entry in entries
+    ]
+    html = _sweep_env.get_template("sweep.html.j2").render(rows=table_rows, n=len(entries))
+    html_path.write_text(html, encoding="utf-8")
+    return EdgeSweepResult(entries=entries, html_path=html_path)
