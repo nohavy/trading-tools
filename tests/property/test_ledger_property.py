@@ -100,10 +100,12 @@ def test_margin_realized_pnl_matches_manual(
     )
     account.apply_fill(open_fill)
     realized = account.apply_fill(close_fill)
-    assert realized == pytest.approx((exit_price - entry) * qty, rel=1e-9)
+    # rounding tolerance grows with the price scale (entry*qty products)
+    scale = max(1.0, entry * qty)
+    assert realized == pytest.approx((exit_price - entry) * qty, abs=1e-9 * scale)
     # full close: the residual position is float rounding, not a real position
-    assert account.position == pytest.approx(0.0, abs=1e-6)
+    assert account.position == pytest.approx(0.0, abs=1e-9 * max(1.0, qty))
     # balance reflects only the realized PnL (no fees)
     assert account.balance == pytest.approx(
-        balance + realized, abs=1e-6 * max(1.0, abs(balance))
+        balance + realized, abs=1e-9 * scale
     )
