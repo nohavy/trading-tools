@@ -47,7 +47,7 @@ class InvalidTransitionError(Exception):
 _TERMINAL = {OrderStatus.FILLED, OrderStatus.CANCELED, OrderStatus.REJECTED}
 _ALLOWED: dict[OrderStatus, set[OrderStatus]] = {
     OrderStatus.PENDING: {OrderStatus.ACTIVE, OrderStatus.CANCELED, OrderStatus.REJECTED},
-    OrderStatus.ACTIVE: {OrderStatus.FILLED, OrderStatus.CANCELED},
+    OrderStatus.ACTIVE: {OrderStatus.FILLED, OrderStatus.CANCELED, OrderStatus.REJECTED},
 }
 
 
