@@ -54,7 +54,9 @@ def test_totals_equal_sum_of_parts(trades: list[tuple[float, float, float, float
     funding=st.floats(min_value=-100, max_value=100, allow_nan=False),
     tamper=st.floats(min_value=1e-3, max_value=1_000, allow_nan=False),
 )
-def test_any_tampering_is_detected(gross: float, fee: float, slippage: float, funding: float, tamper: float) -> None:
+def test_any_tampering_is_detected(
+    gross: float, fee: float, slippage: float, funding: float, tamper: float
+) -> None:
     ledger = Ledger()
     ledger.record_trade(gross=gross, fee=fee, slippage=slippage, funding=funding)
     trade = ledger._trades[0]
@@ -76,7 +78,9 @@ def test_any_tampering_is_detected(gross: float, fee: float, slippage: float, fu
     qty=st.floats(min_value=0.001, max_value=10, allow_nan=False),
     exit_price=st.floats(min_value=1_000, max_value=100_000, allow_nan=False),
 )
-def test_margin_realized_pnl_matches_manual(balance: float, entry: float, qty: float, exit_price: float) -> None:
+def test_margin_realized_pnl_matches_manual(
+    balance: float, entry: float, qty: float, exit_price: float
+) -> None:
     from tradingv2.core.types import Fill, FillRole, Side
     from tradingv2.portfolio.margin import MarginAccount
 
@@ -88,11 +92,17 @@ def test_margin_realized_pnl_matches_manual(balance: float, entry: float, qty: f
     max_adverse = balance * 0.5 / qty
     exit_price = max(entry - max_adverse, min(exit_price, entry + max_adverse))
     account = MarginAccount(balance=balance, leverage=leverage)
-    open_fill = Fill(order_id=1, ts_ns=0, price=entry, qty=qty, fee=0.0, role=FillRole.TAKER, side=Side.BUY)
-    close_fill = Fill(order_id=2, ts_ns=0, price=exit_price, qty=qty, fee=0.0, role=FillRole.TAKER, side=Side.SELL)
+    open_fill = Fill(
+        order_id=1, ts_ns=0, price=entry, qty=qty, fee=0.0, role=FillRole.TAKER, side=Side.BUY
+    )
+    close_fill = Fill(
+        order_id=2, ts_ns=0, price=exit_price, qty=qty, fee=0.0, role=FillRole.TAKER, side=Side.SELL
+    )
     account.apply_fill(open_fill)
     realized = account.apply_fill(close_fill)
     assert realized == pytest.approx((exit_price - entry) * qty, rel=1e-9)
     assert account.position == 0.0
     # balance reflects only the realized PnL (no fees)
-    assert account.balance == pytest.approx(balance + realized, abs=1e-6 * max(1.0, abs(balance)))
+    assert account.balance == pytest.approx(
+        balance + realized, abs=1e-6 * max(1.0, abs(balance))
+    )
