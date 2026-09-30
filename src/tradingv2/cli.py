@@ -1,5 +1,8 @@
 """tv2 command line interface."""
 
+from pathlib import Path
+from typing import Annotated
+
 import typer
 
 app = typer.Typer(
@@ -16,6 +19,29 @@ app.add_typer(data_app, name="data")
 app.add_typer(research_app, name="research")
 app.add_typer(backtest_app, name="backtest")
 app.add_typer(compare_app, name="compare")
+
+
+@data_app.command("download")
+def data_download(
+    config: Annotated[Path, typer.Option(help="YAML configuration file")],
+) -> None:
+    """Download and convert historical data from data.binance.vision."""
+    typer.echo("not implemented yet")
+
+
+@data_app.command("check")
+def data_check(config: Annotated[Path, typer.Option(help="YAML configuration file")]) -> None:
+    """Report data quality anomalies for a downloaded dataset."""
+    typer.echo("not implemented yet")
+
+
+@data_app.command("instruments")
+def data_instruments(
+    market: Annotated[str, typer.Option(help="Market: spot|um")],
+    symbol: Annotated[str, typer.Option(help="Symbol, e.g. BTCUSDT")],
+) -> None:
+    """Fetch and store exchange trading rules for a symbol."""
+    typer.echo("not implemented yet")
 
 
 def main() -> None:
