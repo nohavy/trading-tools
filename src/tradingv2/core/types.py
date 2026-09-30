@@ -93,6 +93,14 @@ class Order:
 
 
 @dataclass(frozen=True)
+class FundingEvent:
+    """One funding settlement for a perpetual."""
+
+    ts_ns: int
+    rate: float
+
+
+@dataclass(frozen=True)
 class PriceBar:
     """One OHLC bar delivered at its close time."""
 

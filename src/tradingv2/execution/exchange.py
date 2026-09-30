@@ -190,6 +190,11 @@ class SimulatedExchange:
     def _reference_price(self) -> float | None:
         return self.last_price
 
+    @property
+    def position_qty(self) -> float:
+        """Signed open position in base units (0 when flat)."""
+        return self._tracker.qty
+
     def _activate(self, order: Order) -> None:
         price = self._reference_price()
         original_qty = order.qty
