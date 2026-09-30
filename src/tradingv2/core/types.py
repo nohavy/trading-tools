@@ -93,6 +93,18 @@ class Order:
 
 
 @dataclass(frozen=True)
+class PriceBar:
+    """One OHLC bar delivered at its close time."""
+
+    ts_open_ns: int
+    open: float
+    high: float
+    low: float
+    close: float
+    ts_close_ns: int
+
+
+@dataclass(frozen=True)
 class Fill:
     """One executed (partial or complete) order fill."""
 

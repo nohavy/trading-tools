@@ -17,7 +17,7 @@ from tradingv2.core.rounding import (
     round_price_to_tick,
     round_qty_to_step,
 )
-from tradingv2.core.types import Fill, FillRole, Order, OrderStatus, OrderType, Side
+from tradingv2.core.types import Fill, FillRole, Order, OrderStatus, OrderType, PriceBar, Side
 from tradingv2.costs.fees import FeeSchedule
 from tradingv2.costs.latency import LatencyModel
 from tradingv2.costs.slippage import SlippageModel
@@ -89,6 +89,9 @@ class SimulatedExchange:
         self._orders: dict[int, Order] = {}
         self._arrivals: list[tuple[int, int, Order]] = []
         self._scheduled: list[tuple[int, int, _ScheduledFill]] = []
+        self._bar_market: list[Order] = []
+        self._active_limits: list[Order] = []
+        self._active_stops: list[Order] = []
         self._seq = 0
 
     # -- submission ----------------------------------------------------------
@@ -163,6 +166,18 @@ class SimulatedExchange:
         else:
             check_price = price
         if check_price is None:
+            if order.type == OrderType.MARKET and self._tape_ts is None:
+                # bars-only mode before the first close: qty/step validated here,
+                # min-notional deferred to the fill (once a price exists).
+                if order.qty <= 0:
+                    order.transition(OrderStatus.REJECTED)
+                    order.reject_reason = (
+                        f"qty {original_qty} rounds to zero at step {self.rules.step_size}"
+                    )
+                    return
+                order.transition(OrderStatus.ACTIVE)
+                self._bar_market.append(order)
+                return
             order.transition(OrderStatus.REJECTED)
             order.reject_reason = "no reference price for market order validation"
             return
@@ -190,11 +205,132 @@ class SimulatedExchange:
             return
         order.transition(OrderStatus.ACTIVE)
         if order.type == OrderType.MARKET:
-            self._schedule_market(order)
+            if self._tape_ts is not None:
+                self._schedule_market(order)
+            else:
+                # bars-only mode: fills at the open of the closing bar window
+                self._bar_market.append(order)
         elif order.type == OrderType.STOP_MARKET:
-            self._schedule_stop(order)
+            if self._tape_ts is not None:
+                self._schedule_stop(order)
+            else:
+                self._active_stops.append(order)
         else:
-            self._schedule_limit(order)
+            if self._tape_ts is not None:
+                self._schedule_limit(order)
+            else:
+                self._active_limits.append(order)
+
+    def on_bar_close(self, bar: PriceBar) -> list[FillEvent]:
+        """Bars-only mode: evaluate queued orders against the bar that closes.
+
+        First advances time to the bar close (arrivals and scheduled fills),
+        then evaluates market/limit/stop orders when no tape is loaded:
+        market orders arriving inside the bar's window fill at its open
+        (conservative: up to one interval of staleness) with slippage;
+        limits fill on touch (optimistic) or trade-through (pessimistic);
+        stops trigger on the level being reached, gap opens fill worse.
+        """
+        events = self.advance_to(bar.ts_close_ns)
+        if self._tape_ts is not None:
+            return events  # tape mode: fills come from the tape only
+        self.last_price = bar.close
+        for order in list(self._bar_market):
+            if order.arrive_ns is not None and order.arrive_ns <= bar.ts_close_ns:
+                self._bar_market.remove(order)
+                event = self._fill_market_bars(order, bar)
+                if event is not None:
+                    events.append(event)
+        for order in list(self._active_limits):
+            if order.arrive_ns is not None and order.arrive_ns <= bar.ts_close_ns:
+                event = self._fill_limit_bars(order, bar)
+                if event is not None:
+                    events.append(event)
+        for order in list(self._active_stops):
+            if order.arrive_ns is not None and order.arrive_ns <= bar.ts_close_ns:
+                event = self._fill_stop_bars(order, bar)
+                if event is not None:
+                    events.append(event)
+        return events
+
+    def _fill_market_bars(self, order: Order, bar: PriceBar) -> FillEvent | None:
+        base = bar.open
+        price = self.slippage.adjust(base, order.side)
+        ok, reason = order_values_pass_filters(
+            order.qty, base, self.rules.step_size, self.rules.tick_size, self.rules.min_notional
+        )
+        if not ok:
+            assert reason is not None
+            order.transition(OrderStatus.REJECTED)
+            order.reject_reason = reason
+            return None
+        notional = price * order.qty
+        fee = self.fees.fee("taker", notional)
+        fill = Fill(
+            order_id=order.id, ts_ns=bar.ts_close_ns, price=price, qty=order.qty,
+            fee=fee, role=FillRole.TAKER, side=order.side,
+        )
+        order.transition(OrderStatus.FILLED)
+        signed = fill.qty if order.side == Side.BUY else -fill.qty
+        realized = self._tracker.apply(signed, price)
+        try:
+            self.account.apply_fill(fill)
+        except AccountError as exc:
+            order.transition(OrderStatus.REJECTED)
+            order.reject_reason = str(exc)
+            return None
+        slippage = self._slippage_cost(base, price, order.qty, order.side)
+        return FillEvent(fill=fill, realized_gross=realized, slippage_cost=slippage)
+
+    def _fill_limit_bars(self, order: Order, bar: PriceBar) -> FillEvent | None:
+        assert order.limit_price is not None
+        if order.side == Side.BUY:
+            touched = bar.low <= order.limit_price
+            through = bar.low < order.limit_price
+        else:
+            touched = bar.high >= order.limit_price
+            through = bar.high > order.limit_price
+        filled = through if self.limit_fill_mode == "pessimistic" else touched
+        if not filled:
+            return None
+        return self._close_limit_fill(order, bar.ts_close_ns)
+
+    def _close_limit_fill(self, order: Order, ts_ns: int) -> FillEvent:
+        assert order.limit_price is not None
+        fee = self.fees.fee("maker", order.qty * order.limit_price)
+        fill = Fill(
+            order_id=order.id, ts_ns=ts_ns, price=order.limit_price, qty=order.qty,
+            fee=fee, role=FillRole.MAKER, side=order.side,
+        )
+        order.transition(OrderStatus.FILLED)
+        signed = fill.qty if order.side == Side.BUY else -fill.qty
+        realized = self._tracker.apply(signed, order.limit_price)
+        self.account.apply_fill(fill)
+        return FillEvent(fill=fill, realized_gross=realized, slippage_cost=0.0)
+
+    def _fill_stop_bars(self, order: Order, bar: PriceBar) -> FillEvent | None:
+        assert order.stop_price is not None
+        if order.side == Side.BUY:
+            if bar.high < order.stop_price:
+                return None
+            raw = max(bar.open, order.stop_price)
+        else:
+            if bar.low > order.stop_price:
+                return None
+            raw = min(bar.open, order.stop_price)
+        price = self.slippage.adjust(raw, order.side)
+        notional = price * order.qty
+        fee = self.fees.fee("taker", notional)
+        fill = Fill(
+            order_id=order.id, ts_ns=bar.ts_close_ns, price=price, qty=order.qty,
+            fee=fee, role=FillRole.TAKER, side=order.side,
+        )
+        order.transition(OrderStatus.FILLED)
+        signed = fill.qty if order.side == Side.BUY else -fill.qty
+        realized = self._tracker.apply(signed, price)
+        self.account.apply_fill(fill)
+        slippage = self._slippage_cost(raw, price, order.qty, order.side)
+        return FillEvent(fill=fill, realized_gross=realized, slippage_cost=slippage)
 
     def _would_cross(self, order: Order) -> bool:
         assert order.limit_price is not None

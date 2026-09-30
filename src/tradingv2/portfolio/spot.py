@@ -16,8 +16,12 @@ class SpotAccount:
     quote_balance: float
     base_balance: float = 0.0
 
-    def apply_fill(self, fill: Fill) -> None:
-        """Apply one fill: adjust cash and inventory; fees are paid in quote."""
+    def apply_fill(self, fill: Fill) -> float:
+        """Apply one fill: adjust cash and inventory; fees are paid in quote.
+
+        Returns 0.0 (spot has no signed-position realized PnL; the engine
+        derives gross PnL from entry/exit prices via the position tracker).
+        """
         notional = fill.price * fill.qty
         if fill.side == Side.BUY:
             total_cost = notional + fill.fee
@@ -34,6 +38,7 @@ class SpotAccount:
                 )
             self.base_balance -= fill.qty
             self.quote_balance += notional - fill.fee
+        return 0.0
 
     def equity(self, mark_price: float) -> float:
         """Account value in quote units at the given mark price."""
