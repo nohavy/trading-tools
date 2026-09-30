@@ -1,6 +1,7 @@
 """Tests for exchange info fetching and instrument rules extraction."""
 
 import json
+from pathlib import Path
 
 import httpx
 import pytest
@@ -93,12 +94,12 @@ def test_fetch_exchange_info_via_mock() -> None:
     assert raw == SPOT_BTCUSDT
 
 
-def test_save_load_roundtrip(tmp_path) -> None:
+def test_save_load_roundtrip(tmp_path: Path) -> None:
     rules = extract_instrument_rules(Market.UM, UM_BTCUSDT, "BTCUSDT")
     save_instrument_rules(rules, tmp_path)
     assert load_instrument_rules(tmp_path, Market.UM, "BTCUSDT") == rules
 
 
-def test_load_missing_rules_raises(tmp_path) -> None:
+def test_load_missing_rules_raises(tmp_path: Path) -> None:
     with pytest.raises(InstrumentError):
         load_instrument_rules(tmp_path, Market.SPOT, "BTCUSDT")
