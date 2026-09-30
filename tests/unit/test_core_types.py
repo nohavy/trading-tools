@@ -17,7 +17,7 @@ T_NS = 1_790_294_400_000_000_000
 
 
 def _mk(**overrides: object) -> Order:
-    kwargs: dict = {
+    kwargs: dict[str, object] = {
         "id": 1,
         "symbol": "BTCUSDT",
         "side": Side.BUY,
