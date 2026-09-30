@@ -1,6 +1,7 @@
 """Tests for SHA256 checksum parsing and file verification."""
 
 import hashlib
+from pathlib import Path
 
 import pytest
 
@@ -37,18 +38,18 @@ def test_parse_checksum_text_malformed_raises() -> None:
         parse_checksum_text("not a checksum at all\n")
 
 
-def test_verify_checksum_accepts_matching_file(tmp_path) -> None:
+def test_verify_checksum_accepts_matching_file(tmp_path: Path) -> None:
     data = b"zip bytes here"
     path = tmp_path / "file.zip"
     path.write_bytes(data)
     assert verify_checksum(path, _sha256(data)) is True
 
 
-def test_verify_checksum_rejects_mismatch(tmp_path) -> None:
+def test_verify_checksum_rejects_mismatch(tmp_path: Path) -> None:
     path = tmp_path / "file.zip"
     path.write_bytes(b"zip bytes here")
     assert verify_checksum(path, _sha256(b"other content")) is False
 
 
-def test_verify_checksum_missing_file_is_false(tmp_path) -> None:
+def test_verify_checksum_missing_file_is_false(tmp_path: Path) -> None:
     assert verify_checksum(tmp_path / "absent.zip", _sha256(b"x")) is False
