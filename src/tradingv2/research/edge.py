@@ -5,8 +5,15 @@ signal that does not beat the round-trip cost of any product/order pair is
 not worth a backtest.
 """
 
-import numpy as np
+import json
+from datetime import UTC, date, datetime
+from pathlib import Path
 
+import numpy as np
+import polars as pl
+import yaml
+
+from tradingv2.data.convert import parse_interval_ns
 from tradingv2.research.signals import SignalEvent
 
 
@@ -130,3 +137,78 @@ def edge_table(
             }
         )
     return rows
+
+
+def _signal_events(config: dict, bars: pl.DataFrame) -> list[SignalEvent]:
+    from tradingv2.research.signals import signal_breakout, signal_flow, signal_meanrev
+
+    signal = config["signal"]
+    name = signal["name"]
+    ts = bars["ts_open_ns"]
+    if name == "meanrev":
+        return signal_meanrev(
+            bars["close"], ts, window=int(signal.get("window", 120)),
+            entry_z=float(signal.get("entry_z", 2.5)),
+        )
+    if name == "breakout":
+        return signal_breakout(
+            bars["high"], bars["low"], bars["close"], bars["volume"], ts,
+            lookback=int(signal.get("lookback", 60)),
+            volume_factor=float(signal.get("volume_factor", 2.0)),
+        )
+    if name == "flow":
+        return signal_flow(
+            bars["volume"], bars["taker_buy_volume"], ts,
+            window=int(signal.get("window", 120)),
+            threshold=float(signal.get("threshold", 0.5)),
+        )
+    raise ValueError(f"unknown signal '{name}' (known: meanrev, breakout, flow)")
+
+
+def _load_bars(config: dict, data_root: Path) -> pl.DataFrame:
+    data = config["data"]
+    interval = data["interval"]
+    directory = data_root / "parquet" / data["market"] / "klines" / data["symbol"] / interval
+    files = sorted(directory.glob("*.parquet")) if directory.is_dir() else []
+    if not files:
+        raise FileNotFoundError(f"no bar data under {directory}: download data first")
+    from datetime import date, timedelta
+
+    lower = int((date.fromisoformat(str(data["start"])) - _EPOCH).total_seconds() * 1e9)
+    upper = int((date.fromisoformat(str(data["end"])) - _EPOCH + timedelta(days=1)).total_seconds() * 1e9) - 1
+    frames = [pl.read_parquet(path) for path in files]
+    df = pl.concat(frames).sort("ts_open_ns")
+    return df.filter((pl.col("ts_open_ns") >= lower) & (pl.col("ts_open_ns") <= upper))
+
+
+_EPOCH = date(1970, 1, 1)
+
+
+def run_edge_study(config_path: Path, data_root: Path, runs_root: Path) -> Path:
+    """Run the edge study described by a research YAML; write runs/edge-*.json."""
+    config = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    bars = _load_bars(config, data_root)
+    if bars.is_empty():
+        raise FileNotFoundError("no bars in the configured period")
+    events = _signal_events(config, bars)
+    ts = bars["ts_open_ns"].to_numpy()
+    close = bars["close"].to_numpy()
+    interval_ns = parse_interval_ns(config["data"]["interval"])
+    horizons_ns = [int(h) * 1_000_000_000 for h in config.get("horizons_s", [1, 5, 15, 30, 60, 300, 900])]
+    cost_pairs = [
+        (pair["name"], float(pair["maker_bps"]) + float(pair["taker_bps"]))
+        for pair in config.get("cost_pairs", [])
+    ]
+    rows = edge_table(events, ts, close, horizons_ns, cost_pairs)
+    runs_root.mkdir(parents=True, exist_ok=True)
+    stamp = datetime.now(UTC).strftime("%Y%m%d-%H%M%S-%f")
+    out = runs_root / f"edge-{stamp}.json"
+    payload = {
+        "created_at": datetime.now(UTC).isoformat(),
+        "signal": config["signal"],
+        "horizons_s": config.get("horizons_s", []),
+        "n_events": len(events),
+        "rows": rows,
+    }
+    out.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    return out
