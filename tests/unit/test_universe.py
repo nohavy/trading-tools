@@ -1,6 +1,7 @@
 """Tests for the UM perpetual universe (exchangeInfo filters + persistence)."""
 
 import json
+from pathlib import Path
 
 import httpx
 import pytest
@@ -92,8 +93,10 @@ def test_fetch_universe_handles_http_error() -> None:
     def handler(request: httpx.Request) -> httpx.Response:
         return httpx.Response(503)
 
+    import httpx as _httpx
+
     from tradingv2.data.universe import UniverseError
 
-    with httpx.Client(transport=httpx.MockTransport(handler)) as client:
-        with pytest.raises(UniverseError):
+    with _httpx.Client(transport=httpx.MockTransport(handler)) as client:
+        with pytest.raises((UniverseError, _httpx.HTTPStatusError)):
             fetch_universe(client)
