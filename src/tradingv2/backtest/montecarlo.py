@@ -1,6 +1,7 @@
 """Monte Carlo bootstrap of trade sequences (dispersion and ruin probability)."""
 
 from dataclasses import dataclass
+from pathlib import Path
 
 import numpy as np
 import polars as pl
@@ -23,7 +24,7 @@ class MonteCarloResult:
     prob_dd_over: float
 
 
-def load_trade_nets(run_dir) -> list[float]:  # noqa: ANN001 - Path
+def load_trade_nets(run_dir: Path) -> list[float]:
     """Read per-trade nets from a run's trips.csv."""
     path = run_dir / "trips.csv"
     if not path.is_file():
@@ -67,7 +68,9 @@ def bootstrap_trips(
     )
 
 
-def bootstrap_run(run_dir, *, n_sims: int, seed: int, dd_threshold: float) -> MonteCarloResult:  # noqa: ANN001
+def bootstrap_run(
+    run_dir: Path, *, n_sims: int, seed: int, dd_threshold: float
+) -> MonteCarloResult:
     """Bootstrap the closed trades of a run directory."""
     return bootstrap_trips(
         load_trade_nets(run_dir), n_sims=n_sims, seed=seed, dd_threshold=dd_threshold
