@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>tradingv2 — sweep ({{ n }} configurations)</title>
+<style>
+body { font-family: system-ui, sans-serif; margin: 24px; }
+table { border-collapse: collapse; }
+td, th { border: 1px solid #ddd; padding: 4px 12px; font-size: 14px; }
+th { background: #eee; }
+.few { color: #b45309; font-style: italic; }
+</style>
+</head>
+<body>
+<h1>Sweep — {{ n }} configurations</h1>
+<table>
+<tr><th>Paramètres</th><th>Espérance nette (bps)</th><th>Trades</th><th>Sharpe</th><th>Net total</th></tr>
+{% for row in rows %}
+<tr>
+  <td>{{ row.params }}</td>
+  <td style="{{ row.color }}">{{ row.expectancy }}{% if row.few_trades %} <span class="few">(trop peu de trades)</span>{% endif %}</td>
+  <td>{{ row.n_trades }}</td>
+  <td>{{ row.sharpe }}</td>
+  <td>{{ row.net_total }}</td>
+</tr>
+{% endfor %}
+</table>
+</body>
+</html>
