@@ -4,7 +4,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Callable
 from dataclasses import dataclass, field
 
-from tradingv2.core.types import OrderType, PriceBar, Side
+from tradingv2.core.types import OrderStatus, OrderType, PriceBar, Side
 from tradingv2.execution.exchange import FillEvent, SimulatedExchange
 
 
@@ -55,6 +55,10 @@ class Context:
         """Schedule on_timer once, delay_ns from now."""
         if self.on_timer_scheduled is not None:
             self.on_timer_scheduled(self.now_ns + delay_ns)
+
+    def order_status(self, order_id: int) -> "OrderStatus | None":
+        """Current status of one of this run's orders."""
+        return self.exchange.order_status(order_id)
 
     def equity(self) -> float:
         """Account equity at the last known price."""

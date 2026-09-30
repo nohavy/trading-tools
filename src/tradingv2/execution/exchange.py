@@ -150,6 +150,11 @@ class SimulatedExchange:
                 events.append(event)
         return events
 
+    def order_status(self, order_id: int) -> OrderStatus | None:
+        """Current status of one order (None if unknown id)."""
+        order = self._orders.get(order_id)
+        return order.status if order is not None else None
+
     # -- timers and order ids ------------------------------------------------
 
     def schedule_timer(self, ts_ns: int) -> None:
