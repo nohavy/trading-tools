@@ -11,6 +11,8 @@ Definitions (documented decisions):
   below `min_days` (too little data for a scan).
 """
 
+from typing import Any
+
 import numpy as np
 import polars as pl
 
@@ -27,7 +29,8 @@ def _std_bps(values: np.ndarray) -> float:
 def _daily_mean(bars: pl.DataFrame, column: str) -> float:
     day = bars["ts_open_ns"] // (86_400 * _S)
     sums = bars.group_by(day).agg(pl.col(column).sum())
-    return float(sums[column].mean())
+    mean: float = float(sums[column].mean())  # type: ignore[arg-type]
+    return mean
 
 
 def asset_metrics(
@@ -35,11 +38,12 @@ def asset_metrics(
     funding: pl.DataFrame | None = None,
     min_quote_volume_daily: float = 0.0,
     min_days: float = 20.0,
-) -> dict[str, object]:
+) -> dict[str, Any]:
     """Compute the potential metrics of one asset from its 1m bars."""
     n_bars = bars.height
     close = bars["close"].to_numpy()
-    vol_bps_1m = _std_bps(close)
+    # polars stubs widen to_numpy() to a wide union; the column is Float64 here.
+    vol_bps_1m: float = _std_bps(np.asarray(close, dtype=np.float64))
 
     # 1h aggregation: group by hour bucket, take the last close of each bucket
     hour_ns = 3600 * _S
@@ -79,7 +83,7 @@ def asset_metrics(
         span_days = span_ns / (86_400.0 * _S)
     dead = quote_volume_daily < min_quote_volume_daily or span_days < min_days
 
-    return {
+    out: dict[str, Any] = {
         "n_bars": n_bars,
         "vol_bps_1m": vol_bps_1m,
         "vol_bps_1h": vol_bps_1h,
@@ -90,3 +94,4 @@ def asset_metrics(
         "funding_p95_bps": funding_p95_bps,
         "dead": dead,
     }
+    return out
