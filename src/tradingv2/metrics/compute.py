@@ -9,11 +9,11 @@ Conventions:
 - All trade/cost fields are None when there are no trades (never zero, never
   a crash) — spec FR-010.
 """
-
 import math
 from dataclasses import dataclass
 from typing import Any
 
+import numpy as np
 import polars as pl
 
 from tradingv2.backtest.engine import RoundTrip
@@ -199,3 +199,95 @@ def metrics_to_json(report: MetricsReport) -> dict[str, Any]:
 def metrics_from_json(raw: dict[str, Any]) -> MetricsReport:
     """Rebuild a report from its JSON form."""
     return MetricsReport(**raw)
+
+
+@dataclass(frozen=True)
+class RegimeMetrics:
+    """Metrics of one volatility regime (bucket of bars)."""
+
+    label: str  # "low" | "mid" | "high"
+    n_bars: int
+    total_return: float | None
+    max_drawdown: float | None
+    sharpe: float | None
+    vol_mean: float | None = None
+
+
+def regime_split(
+    equity: pl.DataFrame,
+    close: pl.Series,
+    interval_ns: int,
+    vol_window: int = 60,
+) -> list[RegimeMetrics]:
+    """Split the run by realized-volatility terciles and report per regime.
+
+    Volatility: rolling std of close returns (population). Bars with an
+    undefined vol (window not full) are excluded. With too few defined bars
+    the whole run is a single "low" bucket.
+    """
+    closes = close.to_numpy()
+    n = len(closes)
+    if n < 2:
+        return []
+    returns = np.diff(closes) / closes[:-1]
+    eq_values = equity["equity"].to_list()
+    # vol of bar i (i >= 1) = std of returns[i-vol_window : i] → bar index offset
+    vols = np.full(n, np.nan)
+    if len(returns) >= vol_window:
+        windows = np.lib.stride_tricks.sliding_window_view(returns, vol_window)
+        vols[vol_window:] = windows.std(axis=1)
+    defined = np.nonzero(~np.isnan(vols))[0]
+    if defined.size == 0:
+        return []
+    vols_defined = vols[defined]
+    q33, q66 = np.percentile(vols_defined, [33.3, 66.7])
+    buckets: dict[str, list[int]] = {"low": [], "mid": [], "high": []}
+    for idx in defined:
+        v = vols[idx]
+        label = "low" if v <= q33 else ("high" if v > q66 else "mid")
+        buckets[label].append(int(idx))
+    if sum(len(b) for b in buckets.values()) <= vol_window:
+        buckets = {"low": [int(i) for i in defined]}
+        labels = ["low"]
+    else:
+        labels = ["low", "mid", "high"]
+    annual = math.sqrt(365 * 86_400 / (interval_ns / 1e9)) if interval_ns > 0 else None
+    out: list[RegimeMetrics] = []
+    for label in labels:
+        indices = buckets.get(label, [])
+        if not indices:
+            continue
+        vols_sub = [float(vols[i]) for i in indices]
+        vol_mean = sum(vols_sub) / len(vols_sub)
+        eq_sub = [eq_values[i] for i in indices]
+        first, last = eq_sub[0], eq_sub[-1]
+        total_return = last / first - 1 if first > 0 else None
+        peak = eq_sub[0]
+        max_dd = 0.0
+        for value in eq_sub:
+            peak = max(peak, value)
+            if peak > 0:
+                max_dd = max(max_dd, (peak - value) / peak)
+        rets = (
+            [eq_sub[i] / eq_sub[i - 1] - 1 for i in range(1, len(eq_sub)) if eq_sub[i - 1] > 0]
+            if len(eq_sub) > 1
+            else []
+        )
+        sharpe = None
+        if rets and annual is not None:
+            mean = sum(rets) / len(rets)
+            variance = sum((r - mean) ** 2 for r in rets) / len(rets)
+            std = variance**0.5
+            if std > 0:
+                sharpe = mean / std * annual
+        out.append(
+            RegimeMetrics(
+                label=label,
+                n_bars=len(indices),
+                total_return=total_return,
+                max_drawdown=max_dd,
+                sharpe=sharpe,
+                vol_mean=vol_mean,
+            )
+        )
+    return out

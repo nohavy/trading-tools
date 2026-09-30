@@ -7,6 +7,7 @@ visible: it never blocks, it reports.
 """
 
 import json
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import date
 from pathlib import Path
@@ -48,13 +49,13 @@ DEFAULT_THRESHOLDS = {
 }
 
 
-def _num(metrics: dict[str, float | int | None], key: str) -> float | None:
+def _num(metrics: Mapping[str, float | int | None], key: str) -> float | None:
     value = metrics.get(key)
     return float(value) if value is not None else None
 
 
 def go_no_go(
-    metrics: dict[str, float | int | None],
+    metrics: Mapping[str, float | int | None],
     *,
     stress_ok: bool | None,
     pct_positive_folds: float | None,
