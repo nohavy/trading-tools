@@ -7,7 +7,7 @@ from typing import Any
 import httpx
 import pytest
 
-from tradingv2.data.download import DownloadError, download_file
+from tradingv2.data.download import DownloadError, DownloadResult, download_file
 
 ZIP_CONTENT = b"PK\x03\x04 fake zip payload " * 40
 
@@ -46,7 +46,7 @@ def make_transport(
     return httpx.MockTransport(handler)
 
 
-def run_download(client: httpx.Client, tmp_path: Path, **kwargs: Any) -> Path | None:
+def run_download(client: httpx.Client, tmp_path: Path, **kwargs: Any) -> DownloadResult:
     url = "https://x/file.zip"
     return download_file(client, url, url + ".CHECKSUM", tmp_path, **kwargs)
 
@@ -56,8 +56,8 @@ def test_download_writes_file_atomically(tmp_path: Path) -> None:
     transport = make_transport(zip_content=ZIP_CONTENT, checksum_sha=sha)
     with httpx.Client(transport=transport) as client:
         result = run_download(client, tmp_path)
-    assert result == tmp_path / "file.zip"
-    assert result.read_bytes() == ZIP_CONTENT
+    assert result.path == tmp_path / "file.zip"
+    assert result.path.read_bytes() == ZIP_CONTENT
     assert not (tmp_path / "file.zip.part").exists()
 
 
@@ -69,7 +69,7 @@ def test_skips_existing_valid_file(tmp_path: Path) -> None:
     transport = make_transport(zip_content=ZIP_CONTENT, checksum_sha=sha, requests=requests)
     with httpx.Client(transport=transport) as client:
         result = run_download(client, tmp_path)
-    assert result == dest
+    assert result.path == dest
     assert dest.read_bytes() == ZIP_CONTENT
     # Only the checksum request was made; the body was not re-downloaded.
     assert len(requests) == 1
@@ -82,8 +82,8 @@ def test_existing_invalid_file_is_redownloaded(tmp_path: Path) -> None:
     transport = make_transport(zip_content=ZIP_CONTENT, checksum_sha=sha)
     with httpx.Client(transport=transport) as client:
         result = run_download(client, tmp_path)
-    assert result is not None
-    assert result.read_bytes() == ZIP_CONTENT
+    assert result.path is not None
+    assert result.path.read_bytes() == ZIP_CONTENT
 
 
 def test_resume_from_partial_file(tmp_path: Path) -> None:
@@ -93,8 +93,8 @@ def test_resume_from_partial_file(tmp_path: Path) -> None:
     transport = make_transport(zip_content=ZIP_CONTENT, checksum_sha=sha)
     with httpx.Client(transport=transport) as client:
         result = run_download(client, tmp_path)
-    assert result is not None
-    assert result.read_bytes() == ZIP_CONTENT
+    assert result.path is not None
+    assert result.path.read_bytes() == ZIP_CONTENT
     assert not part.exists()
 
 
@@ -109,8 +109,8 @@ def test_retry_with_backoff_on_server_errors(tmp_path: Path) -> None:
             client, "https://x/file.zip", "https://x/file.zip.CHECKSUM", tmp_path,
             retries=5, backoff_base=0.5, sleep=delays.append,
         )
-    assert result is not None
-    assert result.read_bytes() == ZIP_CONTENT
+    assert result.path is not None
+    assert result.path.read_bytes() == ZIP_CONTENT
     assert delays == [0.5, 1.0]
 
 
@@ -125,7 +125,7 @@ def test_rate_limit_429_also_backed_off(tmp_path: Path) -> None:
             client, "https://x/file.zip", "https://x/file.zip.CHECKSUM", tmp_path,
             retries=3, backoff_base=0.25, sleep=delays.append,
         )
-    assert result is not None
+    assert result.path is not None
     assert delays == [0.25]
 
 
@@ -147,5 +147,5 @@ def test_missing_checksum_file_returns_none_with_no_corrupt_output(tmp_path: Pat
     transport = make_transport(zip_content=ZIP_CONTENT, checksum_sha=None)
     with httpx.Client(transport=transport) as client:
         result = run_download(client, tmp_path)
-    assert result is None
+    assert result.path is None
     assert list(tmp_path.iterdir()) == []
