@@ -34,6 +34,21 @@ def register_strategy(name: str, cls: type[Strategy]) -> None:
     STRATEGIES[name] = cls
 
 
+def _register_builtins() -> None:
+    from tradingv2.strategies.breakout import BreakoutVolume
+    from tradingv2.strategies.buyhold import BuyHold
+    from tradingv2.strategies.flow import OrderFlowImbalance
+    from tradingv2.strategies.meanrev import MeanRevZScore
+
+    register_strategy("meanrev_zscore", MeanRevZScore)
+    register_strategy("breakout_volume", BreakoutVolume)
+    register_strategy("orderflow_imbalance", OrderFlowImbalance)
+    register_strategy("buy_hold", BuyHold)
+
+
+_register_builtins()
+
+
 def build_strategy(name: str, params: dict[str, float | int | str | bool]) -> Strategy:
     """Instantiate a registered strategy by config name."""
     if name not in STRATEGIES:

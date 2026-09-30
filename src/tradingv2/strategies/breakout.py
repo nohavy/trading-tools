@@ -12,9 +12,9 @@ class BreakoutVolume(Strategy):
 
     def __init__(
         self,
-        lookback: int,
-        volume_factor: float,
-        qty: float,
+        lookback: int = 60,
+        volume_factor: float = 2.0,
+        qty: float = 0.002,
         stop_bps: float | None = None,
         max_hold_bars: int | None = None,
     ) -> None:

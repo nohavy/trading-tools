@@ -14,9 +14,9 @@ class OrderFlowImbalance(Strategy):
 
     def __init__(
         self,
-        window: int,
-        threshold: float,
-        qty: float,
+        window: int = 120,
+        threshold: float = 0.5,
+        qty: float = 0.002,
         stop_bps: float | None = None,
         max_hold_bars: int | None = None,
     ) -> None:

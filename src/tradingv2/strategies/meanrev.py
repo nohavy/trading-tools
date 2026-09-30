@@ -14,10 +14,10 @@ class MeanRevZScore(Strategy):
 
     def __init__(
         self,
-        window: int,
-        entry_z: float,
-        exit_z: float,
-        qty: float,
+        window: int = 120,
+        entry_z: float = 2.5,
+        exit_z: float = 0.5,
+        qty: float = 0.002,
         stop_bps: float | None = None,
         max_hold_bars: int | None = None,
     ) -> None:
