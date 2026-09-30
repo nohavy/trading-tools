@@ -208,11 +208,14 @@ class SimulatedExchange:
 
     # -- market fills on the tape -------------------------------------------
 
-    def _aggressor_mask(self, side: Side) -> np.ndarray:
+    def _aggressor_mask(self, side: Side) -> np.ndarray[tuple[int], np.dtype[np.bool_]]:
         assert self._tape_buyer_maker is not None
         # buy market orders consume aggressor-buy trades (buyer is taker);
         # sell market orders consume trades where the buyer is the maker.
-        return self._tape_buyer_maker == (side == Side.SELL)
+        mask: np.ndarray[tuple[int], np.dtype[np.bool_]] = (
+            self._tape_buyer_maker == (side == Side.SELL)
+        ).astype(np.bool_)
+        return mask
 
     def _schedule_market(self, order: Order) -> None:
         assert self._tape_ts is not None

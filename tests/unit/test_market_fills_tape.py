@@ -3,7 +3,8 @@
 import polars as pl
 import pytest
 
-from tradingv2.core.types import FillRole, OrderStatus, OrderType, Side
+from tradingv2.config import Market
+from tradingv2.core.types import FillRole, Order, OrderStatus, OrderType, Side
 from tradingv2.costs.fees import FeeSchedule
 from tradingv2.costs.latency import LatencyModel
 from tradingv2.costs.slippage import SlippageModel
@@ -14,7 +15,7 @@ from tradingv2.portfolio.margin import MarginAccount
 MS = 1_000_000
 
 RULES = InstrumentRules(
-    symbol="BTCUSDT", market="um", tick_size=0.1, step_size=0.001, min_notional=5.0
+    symbol="BTCUSDT", market=Market.UM, tick_size=0.1, step_size=0.001, min_notional=5.0
 )
 
 # aggressor-buy trades (buyer_is_maker False): ts 100, 300, 400
@@ -40,9 +41,7 @@ def make_exchange(account: MarginAccount | None = None) -> SimulatedExchange:
     )
 
 
-def make_order(**overrides: object) -> object:
-    from tradingv2.core.types import Order
-
+def make_order(**overrides: object) -> Order:
     kwargs: dict[str, object] = {
         "id": 1,
         "symbol": "BTCUSDT",
