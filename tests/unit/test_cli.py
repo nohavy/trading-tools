@@ -58,6 +58,11 @@ def test_cli_backtest_run_missing_config(tmp_path: Path) -> None:
     assert "not found" in result.output
 
 
+def test_cli_compare_needs_existing_runs(tmp_path: Path) -> None:
+    result = runner.invoke(app, ["compare", str(tmp_path / "nope-run")])
+    assert result.exit_code != 0
+
+
 def test_cli_check_clean_dataset_exits_zero(tmp_path: Path) -> None:
     _write_bars(tmp_path, clean=True)
     result = _invoke_check(tmp_path)

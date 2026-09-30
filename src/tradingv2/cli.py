@@ -149,6 +149,39 @@ def data_instruments(
     _run_or_exit(action)
 
 
+@compare_app.command("runs")
+def compare_runs_cmd(
+    runs: Annotated[list[Path], typer.Argument(help="Run directories to compare")],
+    runs_root: Annotated[Path, typer.Option(help="Where to write the comparison HTML")] = Path(  # noqa: E501
+        "runs"
+    ),
+) -> None:
+    """Compare run artifacts: metrics table side by side + HTML."""
+    import json as _json
+
+    for run in runs:
+        if not (run / "metrics.json").is_file():
+            typer.echo(f"not a run directory (no metrics.json): {run}", err=True)
+            raise typer.Exit(code=2)
+    from tradingv2.report.compare import compare_runs, comparison_table
+
+    table = comparison_table(runs)
+    labels = {
+        "total_return": "Rendement", "sharpe": "Sharpe", "sortino": "Sortino",
+        "max_drawdown": "DD max", "calmar": "Calmar", "t_stat": "t-stat",
+        "n_trades": "Trades", "win_rate": "Win rate", "payoff": "Payoff",
+        "profit_factor": "PF", "expectancy_bps": "Espérance bps", "gross_total": "Brut",
+        "fees_total": "Frais", "slippage_total": "Slippage", "funding_total": "Funding",
+        "net_total": "Net", "fee_drag": "Drag",
+    }
+    for key, values in table.items():
+        typer.echo(f"{labels.get(key, key):>16}: " + "  ".join(values))
+    html = compare_runs(runs, runs_root=runs_root)
+    typer.echo(f"comparaison écrite: {html}")
+    del _json
+
+
+
 def main() -> None:
     """Entry point for the tv2 script."""
     app()
