@@ -9,6 +9,7 @@ from tradingv2.costs.fees import FeeSchedule
 from tradingv2.costs.latency import LatencyModel
 from tradingv2.costs.slippage import SlippageModel
 from tradingv2.data.instruments import InstrumentRules
+from tradingv2.execution.exchange import Account as AccountLike
 from tradingv2.execution.exchange import SimulatedExchange
 from tradingv2.portfolio.margin import MarginAccount
 from tradingv2.portfolio.spot import SpotAccount
@@ -31,7 +32,7 @@ def make_bars(n: int = 10) -> list[PriceBar]:
     ]
 
 
-def make_engine(account, strategy: Strategy) -> Engine:
+def make_engine(account: "AccountLike", strategy: Strategy) -> Engine:
     exchange = SimulatedExchange(
         rules=RULES,
         account=account,
