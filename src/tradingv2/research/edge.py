@@ -8,6 +8,7 @@ not worth a backtest.
 import json
 from datetime import UTC, date, datetime
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 import polars as pl
@@ -77,12 +78,12 @@ def edge_table(
     close: np.ndarray,
     horizons_ns: list[int],
     cost_pairs: list[tuple[str, float]],
-) -> list[dict[str, object]]:
+) -> list[dict[str, Any]]:
     """Rows per horizon: n, mean/median bps, hit rate, excursions, edges vs costs.
 
     edges = {cost_pair_name: mean_bps - round_trip_bps} (None without data).
     """
-    rows: list[dict[str, object]] = []
+    rows: list[dict[str, Any]] = []
     for horizon in horizons_ns:
         rets: list[float] = []
         mfes: list[float] = []
@@ -138,7 +139,7 @@ def edge_table(
     return rows
 
 
-def _signal_events(config: dict[str, object], bars: pl.DataFrame) -> list[SignalEvent]:
+def _signal_events(config: dict[str, Any], bars: pl.DataFrame) -> list[SignalEvent]:
     from tradingv2.research.signals import signal_breakout, signal_flow, signal_meanrev
 
     signal = config["signal"]
@@ -164,7 +165,7 @@ def _signal_events(config: dict[str, object], bars: pl.DataFrame) -> list[Signal
     raise ValueError(f"unknown signal '{name}' (known: meanrev, breakout, flow)")
 
 
-def _load_bars(config: dict[str, object], data_root: Path) -> pl.DataFrame:
+def _load_bars(config: dict[str, Any], data_root: Path) -> pl.DataFrame:
     data = config["data"]
     interval = data["interval"]
     directory = data_root / "parquet" / data["market"] / "klines" / data["symbol"] / interval

@@ -4,7 +4,7 @@ import json
 from collections.abc import Callable
 from datetime import date
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Any
 
 import httpx
 import polars as pl
@@ -175,7 +175,7 @@ def research_edge(
     _run_or_exit(action)
 
 
-def _fmt_edge_row(row: dict[str, object]) -> str:
+def _fmt_edge_row(row: dict[str, Any]) -> str:
     mean = row["mean_bps"]
     median = row["median_bps"]
     hit = row["hit_rate"]
