@@ -60,7 +60,7 @@ def test_stress_modifies_costs_only(tmp_path: Path) -> None:
     results = stress_test(cfg, data_root=data_root, runs_root=runs)
     assert [r.name for r in results] == list(STRESS_SCENARIOS)
     base = yaml.safe_load(cfg.read_text(encoding="utf-8"))
-    def normalize(d: dict, reference: dict) -> dict:
+    def normalize(d: dict[str, object], reference: dict[str, object]) -> dict[str, object]:
         # only reference keys: defaults added by the model dump are ignored
         subset = {k: d[k] for k in reference if k in d and d[k] is not None}
         return json.loads(json.dumps(subset, default=str))
