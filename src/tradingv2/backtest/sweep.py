@@ -90,6 +90,7 @@ def _run_one(
     data_root: str,
     runs_root: str,
     min_trades: int,
+    bar_bounds: tuple[int, int] | None,
 ) -> SweepEntry:
     params: dict[str, float | int] = dict(zip(param_names, combo, strict=True))
     variant = yaml.safe_load(yaml.safe_dump(base_config))  # deep copy, dates preserved
@@ -98,7 +99,9 @@ def _run_one(
     config_path = Path(runs_root) / f".sweep-config-{stamp}-{index}.yaml"
     config_path.parent.mkdir(parents=True, exist_ok=True)
     config_path.write_text(yaml.safe_dump(variant), encoding="utf-8")
-    run_dir = run_backtest(config_path, data_root=Path(data_root), runs_root=Path(runs_root))
+    run_dir = run_backtest(
+        config_path, data_root=Path(data_root), runs_root=Path(runs_root), bar_bounds=bar_bounds
+    )
     config_path.unlink()
     metrics = json.loads((run_dir / "metrics.json").read_text(encoding="utf-8"))
     return SweepEntry(
@@ -133,6 +136,7 @@ def sweep_grid(
     runs_root: Path,
     workers: int = 1,
     min_trades: int = 30,
+    bar_bounds: tuple[int, int] | None = None,
 ) -> SweepResult:
     """Run every grid combination as a full backtest, rank by net expectancy.
 
@@ -143,7 +147,7 @@ def sweep_grid(
     combos = list(product(*[grid[key] for key in param_names]))
     runs_root.mkdir(parents=True, exist_ok=True)
     args = [
-        (i, combo, param_names, base_config, str(data_root), str(runs_root), min_trades)
+        (i, combo, param_names, base_config, str(data_root), str(runs_root), min_trades, bar_bounds)
         for i, combo in enumerate(combos)
     ]
     if workers <= 1:

@@ -26,7 +26,9 @@ class RunnerError(Exception):
     """Raised when a backtest cannot be prepared (data, strategy, catalog)."""
 
 
-def _load_bars(cfg: BacktestConfig, data_root: Path) -> list[PriceBar]:
+def _load_bars(
+    cfg: BacktestConfig, data_root: Path, bar_bounds: tuple[int, int] | None = None
+) -> list[PriceBar]:
     catalog_path = data_root / "catalog.json"
     if not catalog_path.is_file():
         raise RunnerError(
@@ -61,6 +63,9 @@ def _load_bars(cfg: BacktestConfig, data_root: Path) -> list[PriceBar]:
                 )
             )
     bars = [b for b in bars if lower_ns <= b.ts_close_ns <= upper_ns]
+    if bar_bounds is not None:
+        lower, upper = bar_bounds
+        bars = [b for b in bars if lower <= b.ts_close_ns <= upper]
     bars.sort(key=lambda b: b.ts_close_ns)
     return bars
 
@@ -86,11 +91,21 @@ def _git_commit() -> str:
         return "unknown"
 
 
-def run_backtest(config_path: Path, data_root: Path, runs_root: Path) -> Path:
-    """Run one backtest from a config file; return the run directory."""
+def run_backtest(
+    config_path: Path,
+    data_root: Path,
+    runs_root: Path,
+    *,
+    bar_bounds: tuple[int, int] | None = None,
+) -> Path:
+    """Run one backtest from a config file; return the run directory.
+
+    bar_bounds optionally restricts the bars by close timestamp (walk-forward
+    folds, sweeps on segments).
+    """
     cfg = load_backtest_config(config_path)
     strategy = build_strategy(cfg.strategy.name, cfg.strategy.params)
-    bars = _load_bars(cfg, data_root)
+    bars = _load_bars(cfg, data_root, bar_bounds)
     tape = _load_tape(cfg, data_root)
 
     account: MarginAccount | SpotAccount
@@ -221,6 +236,23 @@ def _record(
         }
     )
     orders.write_csv(run_dir / "orders.csv")
+    trips = pl.DataFrame(
+        {
+            "entry_ts": [t.entry_ts for t in result.round_trips],
+            "exit_ts": [t.exit_ts for t in result.round_trips],
+            "side": [t.side for t in result.round_trips],
+            "qty": [t.qty for t in result.round_trips],
+            "entry_price": [t.entry_price for t in result.round_trips],
+            "exit_price": [t.exit_price for t in result.round_trips],
+            "gross": [t.gross for t in result.round_trips],
+            "fees": [t.fees for t in result.round_trips],
+            "slippage": [t.slippage for t in result.round_trips],
+            "funding": [t.funding for t in result.round_trips],
+            "net": [t.net for t in result.round_trips],
+            "hold_ns": [t.hold_ns for t in result.round_trips],
+        }
+    )
+    trips.write_csv(run_dir / "trips.csv")
     summary = {
         "n_bars": result.n_bars,
         "n_fills": len(result.fill_events),
