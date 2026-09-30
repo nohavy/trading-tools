@@ -1,9 +1,10 @@
 """Perpetual margin account: signed position, leverage, funding, liquidation."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from tradingv2.core.types import Fill, Side
 from tradingv2.portfolio.spot import AccountError
+from tradingv2.portfolio.tracker import PositionTracker
 
 MAX_LEVERAGE = 20.0
 
@@ -15,8 +16,7 @@ class MarginAccount:
     balance: float
     leverage: float = 1.0
     mmr: float = 0.004
-    position: float = 0.0
-    entry_price: float = 0.0
+    _tracker: PositionTracker = field(default_factory=PositionTracker, repr=False, compare=False)
 
     def __post_init__(self) -> None:
         if self.leverage <= 0 or self.leverage > MAX_LEVERAGE:
@@ -24,32 +24,22 @@ class MarginAccount:
         if self.balance <= 0:
             raise ValueError(f"balance must be positive, got {self.balance}")
 
+    @property
+    def position(self) -> float:
+        """Signed position in base units (long > 0)."""
+        return self._tracker.qty
+
+    @property
+    def entry_price(self) -> float:
+        """Average entry price of the open position."""
+        return self._tracker.entry
+
     def apply_fill(self, fill: Fill) -> float:
         """Apply one fill; return the realized gross PnL on position reduction."""
         signed_qty = fill.qty if fill.side == Side.BUY else -fill.qty
         self.balance -= fill.fee
-        same_direction = signed_qty * self.position > 0 or self.position == 0.0
-        realized = 0.0
-        if not same_direction:
-            reduce_qty = min(abs(signed_qty), abs(self.position))
-            direction = 1.0 if self.position > 0 else -1.0
-            realized = (fill.price - self.entry_price) * reduce_qty * direction
-            self.balance += realized
-        new_position = self.position + signed_qty
-        if self.position == 0.0 or same_direction:
-            total_cost = abs(self.position) * self.entry_price + abs(signed_qty) * fill.price
-            new_abs = abs(new_position)
-            self.entry_price = total_cost / new_abs if new_abs > 0 else 0.0
-        elif abs(new_position) > abs(self.position):
-            old_entry = self.entry_price
-            flipped_size = abs(new_position) - abs(self.position)
-            total_cost = abs(self.position) * old_entry + flipped_size * fill.price
-            self.entry_price = total_cost / abs(new_position)
-        else:
-            # full flip: the remainder opens a new position at the fill price
-            if new_position != 0.0 and self.position != 0.0 and signed_qty * new_position > 0:
-                self.entry_price = fill.price
-        self.position = new_position
+        realized = self._tracker.apply(signed_qty, fill.price)
+        self.balance += realized
         self._check_margin(fill.price)
         return realized
 

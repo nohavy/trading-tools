@@ -5,7 +5,8 @@ an active order is O(log n) per event, not O(trades). Cancellation after a
 scheduled fill time behaves like reality: the fill still arrives.
 """
 
-import heapq
+from dataclasses import dataclass, field
+from heapq import heapify, heappop, heappush
 from typing import Protocol
 
 import numpy as np
@@ -22,10 +23,30 @@ from tradingv2.costs.latency import LatencyModel
 from tradingv2.costs.slippage import SlippageModel
 from tradingv2.data.instruments import InstrumentRules
 from tradingv2.portfolio.spot import AccountError
+from tradingv2.portfolio.tracker import PositionTracker
 
 
 class ExchangeError(Exception):
     """Raised for exchange-level misuse (unknown order id, etc.)."""
+
+
+@dataclass(frozen=True)
+class FillEvent:
+    """One fill applied to the account, with its PnL decomposition."""
+
+    fill: Fill
+    realized_gross: float
+    slippage_cost: float
+
+
+@dataclass
+class _ScheduledFill:
+    """Pending fill work for one order."""
+
+    order: Order
+    start_idx: int
+    remaining: float
+    reference_price: float | None
 
 
 class Account(Protocol):
@@ -36,39 +57,34 @@ class Account(Protocol):
     def equity(self, mark_price: float) -> float: ...
 
 
+@dataclass
 class SimulatedExchange:
     """Order lifecycle simulation against a trade tape (or bars only)."""
 
-    def __init__(
-        self,
-        rules: InstrumentRules,
-        account: Account,
-        fees: FeeSchedule,
-        slippage: SlippageModel,
-        latency: LatencyModel,
-        tape: pl.DataFrame | None = None,
-        limit_fill_mode: str = "pessimistic",
-    ) -> None:
-        self.rules = rules
-        self.account = account
-        self.fees = fees
-        self.slippage = slippage
-        self.latency = latency
-        self.limit_fill_mode = limit_fill_mode
+    rules: InstrumentRules
+    account: Account
+    fees: FeeSchedule
+    slippage: SlippageModel
+    latency: LatencyModel
+    tape: pl.DataFrame | None = None
+    limit_fill_mode: str = "pessimistic"
+    _tracker: PositionTracker = field(default_factory=PositionTracker, init=False, repr=False)
+
+    def __post_init__(self) -> None:
         self.last_price: float | None = None
         self._tape_ts: np.ndarray[tuple[int], np.dtype[np.int64]] | None = None
         self._tape_price: np.ndarray[tuple[int], np.dtype[np.float64]] | None = None
         self._tape_qty: np.ndarray[tuple[int], np.dtype[np.float64]] | None = None
         self._tape_buyer_maker: np.ndarray[tuple[int], np.dtype[np.bool_]] | None = None
-        if tape is not None:
-            self._tape_ts = tape["ts_ns"].to_numpy()
-            self._tape_price = tape["price"].to_numpy()
-            self._tape_qty = tape["qty"].to_numpy()
-            self._tape_buyer_maker = tape["buyer_is_maker"].to_numpy()
+        if self.tape is not None:
+            self._tape_ts = self.tape["ts_ns"].to_numpy()
+            self._tape_price = self.tape["price"].to_numpy()
+            self._tape_qty = self.tape["qty"].to_numpy()
+            self._tape_buyer_maker = self.tape["buyer_is_maker"].to_numpy()
             self.last_price = float(self._tape_price[0])
         self._orders: dict[int, Order] = {}
         self._arrivals: list[tuple[int, int, Order]] = []
-        self._scheduled: list[tuple[int, int, Order]] = []
+        self._scheduled: list[tuple[int, int, _ScheduledFill]] = []
         self._seq = 0
 
     # -- submission ----------------------------------------------------------
@@ -78,7 +94,7 @@ class SimulatedExchange:
         order.arrive_ns = order.submitted_ns + self.latency.sample_ns()
         self._orders[order.id] = order
         self._seq += 1
-        heapq.heappush(self._arrivals, (order.arrive_ns, self._seq, order))
+        heappush(self._arrivals, (order.arrive_ns, self._seq, order))
         return order
 
     def cancel(self, order_id: int, now_ns: int) -> None:
@@ -92,32 +108,32 @@ class SimulatedExchange:
         if order.status != OrderStatus.ACTIVE:
             return
         for ts, seq, scheduled in self._scheduled:
-            if scheduled.id == order_id:
+            if scheduled.order.id == order_id:
                 if ts > now_ns + self.latency.sample_ns():
                     order.transition(OrderStatus.CANCELED)
                     self._scheduled.remove((ts, seq, scheduled))
-                    heapq.heapify(self._scheduled)
+                    heapify(self._scheduled)
                 return
         order.transition(OrderStatus.CANCELED)
 
     # -- clock ---------------------------------------------------------------
 
-    def advance_to(self, ts_ns: int) -> list[Fill]:
-        """Process arrivals and scheduled fills up to ts_ns; return fills made."""
-        fills: list[Fill] = []
+    def advance_to(self, ts_ns: int) -> list[FillEvent]:
+        """Process arrivals and scheduled fills up to ts_ns; return fill events."""
+        events: list[FillEvent] = []
         while self._arrivals and self._arrivals[0][0] <= ts_ns:
-            _, _, order = heapq.heappop(self._arrivals)
+            _, _, order = heappop(self._arrivals)
             if order.status != OrderStatus.PENDING:
                 continue
             self._activate(order)
         while self._scheduled and self._scheduled[0][0] <= ts_ns:
-            _, _, order = heapq.heappop(self._scheduled)
-            if order.status != OrderStatus.ACTIVE:
+            _, _, scheduled = heappop(self._scheduled)
+            if scheduled.order.status != OrderStatus.ACTIVE:
                 continue
-            fill = self._execute(order)
-            if fill is not None:
-                fills.append(fill)
-        return fills
+            event = self._execute_market(scheduled)
+            if event is not None:
+                events.append(event)
+        return events
 
     # -- internals -----------------------------------------------------------
 
@@ -160,7 +176,7 @@ class SimulatedExchange:
             return
         order.transition(OrderStatus.ACTIVE)
         if order.type == OrderType.MARKET:
-            self._schedule(order)
+            self._schedule_market(order)
 
     def _would_cross(self, order: Order) -> bool:
         assert order.limit_price is not None
@@ -178,7 +194,7 @@ class SimulatedExchange:
         if isinstance(self.account, SpotAccount):
             required = order.qty * price
             if order.side == Side.BUY:
-                worst_fee = self._worst_fee(order, FillRole.TAKER, required)
+                worst_fee = self.fees.fee("taker", required)
                 if required + worst_fee > self.account.quote_balance:
                     raise AccountError(f"insufficient quote for {order.qty} at {price}")
             return
@@ -190,15 +206,79 @@ class SimulatedExchange:
                     f"insufficient margin: used {margin_used} > equity {self.account.equity(price)}"
                 )
 
-    def _worst_fee(self, order: Order, role: FillRole, notional: float) -> float:
-        del order
-        return self.fees.fee("taker" if role == FillRole.TAKER else "maker", notional)
+    # -- market fills on the tape -------------------------------------------
 
-    def _schedule(self, order: Order) -> None:
-        # predictive fill scheduling is implemented in the tape-fill cycle (T010);
-        # until then market orders rest without filling.
-        del order
+    def _aggressor_mask(self, side: Side) -> np.ndarray:
+        assert self._tape_buyer_maker is not None
+        # buy market orders consume aggressor-buy trades (buyer is taker);
+        # sell market orders consume trades where the buyer is the maker.
+        return self._tape_buyer_maker == (side == Side.SELL)
 
-    def _execute(self, order: Order) -> Fill | None:
-        del order
-        raise NotImplementedError("tape fills arrive in T010-T012")
+    def _schedule_market(self, order: Order) -> None:
+        assert self._tape_ts is not None
+        assert order.arrive_ns is not None
+        first = self._first_aggressor_index(order.arrive_ns, order.side)
+        if first is None:
+            return  # no liquidity yet: the order rests
+        reference = self._reference_price()
+        self._seq += 1
+        scheduled = _ScheduledFill(order, first, order.qty, reference)
+        heappush(self._scheduled, (int(self._tape_ts[first]), self._seq, scheduled))
+
+    def _first_aggressor_index(self, from_ns: int, side: Side) -> int | None:
+        assert self._tape_ts is not None
+        lo = int(np.searchsorted(self._tape_ts, from_ns, side="left"))
+        if lo >= len(self._tape_ts):
+            return None
+        mask = self._aggressor_mask(side)[lo:]
+        indices = np.nonzero(mask)[0]
+        if indices.size == 0:
+            return None
+        return lo + int(indices[0])
+
+    def _execute_market(self, scheduled: _ScheduledFill) -> FillEvent | None:
+        assert self._tape_ts is not None
+        assert self._tape_price is not None
+        assert self._tape_qty is not None
+        order = scheduled.order
+        aggressor = self._aggressor_mask(order.side)
+        notional = 0.0
+        consumed = 0.0
+        last_ts = int(self._tape_ts[scheduled.start_idx])
+        index = scheduled.start_idx
+        remaining = scheduled.remaining
+        while remaining > 1e-12 and index < len(self._tape_ts):
+            if aggressor[index]:
+                take = min(float(self._tape_qty[index]), remaining)
+                notional += float(self._tape_price[index]) * take
+                consumed += take
+                remaining -= take
+                last_ts = int(self._tape_ts[index])
+            index += 1
+        if remaining > 1e-12:
+            return None  # tape exhausted: the order rests (sizes << liquidity in v1)
+        vwap = notional / consumed
+        fee = self.fees.fee("taker", notional)
+        fill = Fill(
+            order_id=order.id,
+            ts_ns=last_ts,
+            price=vwap,
+            qty=consumed,
+            fee=fee,
+            role=FillRole.TAKER,
+            side=order.side,
+        )
+        order.transition(OrderStatus.FILLED)
+        realized = self._tracker.apply(fill.qty if order.side == Side.BUY else -fill.qty, vwap)
+        self.account.apply_fill(fill)
+        slippage = self._slippage_cost(scheduled.reference_price, vwap, consumed, order.side)
+        self.last_price = vwap
+        return FillEvent(fill=fill, realized_gross=realized, slippage_cost=slippage)
+
+    def _slippage_cost(
+        self, reference: float | None, fill_price: float, qty: float, side: Side
+    ) -> float:
+        if reference is None:
+            return 0.0
+        sign = 1.0 if side == Side.BUY else -1.0
+        return (fill_price - reference) * qty * sign
