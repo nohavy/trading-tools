@@ -2,15 +2,20 @@
 
 from datetime import date
 from pathlib import Path
+from typing import Any
 
 import polars as pl
 import pytest
 
-from tradingv2.backtest.config import BacktestConfig, DataSpec
+from tradingv2.backtest.config import (
+    AccountSpec,
+    BacktestConfig,
+    CostsSpec,
+    DataSpec,
+    LatencySpec,
+    StrategySpec,
+)
 from tradingv2.backtest.runner import _load_bars
-from typing import Any
-
-import tradingv2.backtest.runner as runner
 
 
 def make_env(tmp_path: Path) -> tuple[Path, BacktestConfig]:
@@ -46,27 +51,26 @@ def make_env(tmp_path: Path) -> tuple[Path, BacktestConfig]:
             end=date(2020, 3, 31),
             tape=None,
         ),
-        account={
-            "type": "margin", "balance": 1000, "leverage": 5, "mmr": 0.004,
-        },
-        costs={
-            "maker_bps": 2, "taker_bps": 5, "slippage_bps": 0.5,
-            "latency": {"mean_ms": 150, "jitter_ms": 50, "seed": 42},
-        },
-        strategy={"name": "trivial", "params": {}},
+        account=AccountSpec(type="margin", balance=1000.0, leverage=5, mmr=0.004),
+        costs=CostsSpec(
+            maker_bps=2, taker_bps=5, slippage_bps=0.5,
+            latency=LatencySpec(mean_ms=150, jitter_ms=50, seed=42),
+        ),
+        strategy=StrategySpec(name="trivial", params={}),
     )
     return tmp_path, cfg
 
 
 def _spy_reads(monkeypatch: pytest.MonkeyPatch) -> list[str]:
     reads: list[str] = []
-    original = runner.pl.read_parquet
+    original = pl.read_parquet
 
     def spy(path: Any, *args: Any, **kwargs: Any) -> pl.DataFrame:
         reads.append(Path(str(path)).name)
-        return original(path, *args, **kwargs)
+        out: pl.DataFrame = original(path, *args, **kwargs)
+        return out
 
-    monkeypatch.setattr(runner.pl, "read_parquet", spy)
+    monkeypatch.setattr(pl, "read_parquet", spy)
     return reads
 
 
