@@ -60,7 +60,7 @@ def test_buy_stop_triggers_on_first_crossing() -> None:
 
 def test_sell_stop_triggers_below() -> None:
     exchange = make_exchange()
-    order = exchange.submit(make_stop(Side.SELL, 4999.7))
+    order = exchange.submit(make_stop(Side.SELL, 4999.7, qty=0.002))
     events = exchange.advance_to(1_000 * MS)
     assert order.status == OrderStatus.FILLED
     assert events[0].fill.ts_ns == 400 * MS  # first trade <= 4999.7 is 4999.5 at 400ms

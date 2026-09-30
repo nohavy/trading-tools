@@ -384,6 +384,7 @@ class SimulatedExchange:
         heappush(self._scheduled, (int(self._tape_ts[first]), self._seq, scheduled))
 
     def _execute_stop(self, scheduled: _ScheduledFill) -> FillEvent | None:
+        assert self._tape_ts is not None
         assert self._tape_price is not None
         order = scheduled.order
         trigger_price = float(self._tape_price[scheduled.start_idx])
