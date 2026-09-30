@@ -23,6 +23,21 @@ from tradingv2.strategies.builtin import build_strategy
 _EPOCH = date(1970, 1, 1)
 
 
+def _file_overlaps_bounds(path: Path, bounds: tuple[int, int]) -> bool:
+    """Monthly file stem 'SYMBOL-interval-YYYY-MM' overlaps [lower, upper] ns?"""
+    match = __import__("re").search(r"-(\d{4}-\d{2})\.parquet$", path.name)
+    if match is None:
+        return True  # unknown stem: keep (daily files handled by caller filtering)
+    year, month = int(match.group(1)[:4]), int(match.group(1)[5:7])
+    from datetime import date as _date
+
+    month_start = int((_date(year, month, 1) - _EPOCH).total_seconds() * 1e9)
+    next_month = _date(year + (month == 12), month % 12 + 1, 1)
+    month_end = int((next_month - _EPOCH).total_seconds() * 1e9)
+    lower, upper = bounds
+    return month_start <= upper and month_end >= lower
+
+
 class RunnerError(Exception):
     """Raised when a backtest cannot be prepared (data, strategy, catalog)."""
 
@@ -42,6 +57,8 @@ def _load_bars(
     files = sorted(directory.glob("*.parquet")) if directory.is_dir() else []
     if not files:
         raise RunnerError(f"no bar data under {directory}: download data first")
+    if bar_bounds is not None:
+        files = [f for f in files if _file_overlaps_bounds(f, bar_bounds)]
     from datetime import timedelta
 
     lower_ns = int((cfg.data.start - _EPOCH).total_seconds() * 1e9)
