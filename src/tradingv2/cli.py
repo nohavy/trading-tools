@@ -73,6 +73,7 @@ def data_check(
             raise typer.Exit(code=2)
         market_dir = cfg.data.market.value
         interval = cfg.data.interval
+        assert interval is not None  # guaranteed by DataConfig for klines
         directory = data_root / "parquet" / market_dir / "klines" / cfg.data.symbol / interval
         files = sorted(directory.glob("*.parquet")) if directory.is_dir() else []
         if not files:
