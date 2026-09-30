@@ -54,6 +54,8 @@ class BreakoutVolume(Strategy):
             self._shift(bar)
             return
         self._hold_count += 1
+        assert self._entry_range_high is not None
+        assert self._entry_range_low is not None
         exit_needed = (
             (position > 0 and bar.close < self._entry_range_high)
             or (position < 0 and bar.close > self._entry_range_low)
