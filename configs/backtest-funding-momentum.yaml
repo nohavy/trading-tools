@@ -1,0 +1,26 @@
+data:
+  market: um
+  kind: klines
+  symbol: BTCUSDT
+  interval: 1m
+  start: 2020-01-01
+  end: 2026-08-31
+account:
+  type: margin
+  balance: 1000
+  leverage: 5
+costs:
+  maker_bps: 2
+  taker_bps: 5
+  slippage_bps: 0.5
+  latency:
+    mean_ms: 150
+    jitter_ms: 50
+    seed: 42
+strategy:
+  name: funding_momentum
+  params:
+    window_events: 250
+    threshold_pct: 90
+    hold_bars: 1440
+    qty: 0.002

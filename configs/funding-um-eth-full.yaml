@@ -1,0 +1,6 @@
+data:
+  market: um
+  kind: fundingRate
+  symbol: ETHUSDT
+  start: 2019-09-01
+  end: 2026-08-31

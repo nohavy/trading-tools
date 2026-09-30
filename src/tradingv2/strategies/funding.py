@@ -26,7 +26,10 @@ class FundingMomentum(Strategy):
         threshold_pct: float = 90.0,
         hold_bars: int = 1440,
         qty: float = 0.002,
+        direction: str = "buy",
     ) -> None:
+        if direction not in ("buy", "sell"):
+            raise ValueError(f"direction must be 'buy' or 'sell', got {direction!r}")
         if window_events <= 0:
             raise ValueError(f"window_events must be positive, got {window_events}")
         if not 50 < threshold_pct <= 100:
@@ -35,6 +38,8 @@ class FundingMomentum(Strategy):
         self._threshold_pct = threshold_pct
         self._hold_bars = hold_bars
         self._qty = qty
+        self._direction = Side.BUY if direction == "buy" else Side.SELL
+        self._exit_side = Side.SELL if direction == "buy" else Side.BUY
         self._min_history = max(5, window_events // 2)
         self._history: list[float] = []
         self._state = _FLAT
@@ -51,7 +56,7 @@ class FundingMomentum(Strategy):
             threshold = float(np.percentile(past, self._threshold_pct))
             median = float(np.percentile(past, 50.0))
             if rate >= threshold and rate > median:
-                self._entry_order_id = ctx.submit_market(Side.BUY, qty=self._qty)
+                self._entry_order_id = ctx.submit_market(self._direction, qty=self._qty)
                 self._bars_held = 0
                 self._state = ENTERING
         self._history.append(rate)
@@ -72,7 +77,7 @@ class FundingMomentum(Strategy):
                 return
             self._bars_held += 1
             if self._bars_held >= self._hold_bars and self._exit_pending_id is None:
-                self._exit_pending_id = ctx.submit_market(Side.SELL, qty=abs(position))
+                self._exit_pending_id = ctx.submit_market(self._exit_side, qty=abs(position))
                 self._state = EXITING
         # EXITING: wait for the fill (on_fill resets to flat)
 

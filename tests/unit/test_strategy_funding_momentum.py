@@ -116,3 +116,20 @@ def test_nan_rates_ignored() -> None:
     result = engine.run(funding_events=funding_at(list(range(1, 9)), rates))
     buys = [e.fill for e in result.fill_events if e.fill.side == Side.BUY]
     assert len(buys) == 1  # the NaN did not break anything; the spike still fires
+
+
+def test_carry_direction_enters_short_on_extreme() -> None:
+    """direction='sell' : le carry encaisse le funding des longs payants."""
+    strategy = FundingMomentum(
+        window_events=10, threshold_pct=90, hold_bars=30, qty=0.002, direction="sell"
+    )
+    rates = [0.0001] * 6 + [0.001]
+    engine = make_engine(strategy)
+    result = engine.run(funding_events=funding_at(list(range(1, 8)), rates))
+    sells = [e.fill for e in result.fill_events if e.fill.side == Side.SELL]
+    assert sells, "the carry short must trigger on a funding extreme"
+    assert sells[0].ts_ns == 8 * S
+    trips = result.round_trips
+    assert len(trips) == 1
+    assert trips[0].side == "sell"
+    assert trips[0].hold_ns == pytest.approx(31 * S)
