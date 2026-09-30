@@ -14,6 +14,7 @@ from tradingv2.costs.slippage import SlippageModel
 from tradingv2.data.convert import parse_interval_ns
 from tradingv2.data.instruments import InstrumentRules
 from tradingv2.execution.exchange import SimulatedExchange
+from tradingv2.metrics.compute import MetricsReport
 from tradingv2.portfolio.margin import MarginAccount
 from tradingv2.portfolio.spot import SpotAccount
 from tradingv2.strategies.builtin import build_strategy
@@ -171,11 +172,11 @@ def _load_funding(cfg: BacktestConfig, data_root: Path) -> list[FundingEvent] | 
 def _record(
     cfg: BacktestConfig,
     result: EngineResult,
-    metrics,  # noqa: ANN001 - MetricsReport
+    metrics: "MetricsReport",
     data_root: Path,
     runs_root: Path,
     *,
-    metrics_json: dict,  # noqa: ANN001
+    metrics_json: dict[str, float | int | None],
     render: bool = False,
 ) -> Path:
     stamp = datetime.now(UTC).strftime("%Y%m%d-%H%M%S-%f")

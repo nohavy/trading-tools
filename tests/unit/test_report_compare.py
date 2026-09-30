@@ -53,9 +53,7 @@ def test_comparison_table_aligns_runs(tmp_path: Path) -> None:
     table = comparison_table([run1, run2])
     assert "total_return" in table
     assert len(table["total_return"]) == 2
-    assert table["n_trades"] == ["1", "1"] or table["n_trades"] == [2, 1] or all(
-        isinstance(v, (int, float, str)) for v in table["n_trades"]
-    )
+    assert all(isinstance(v, str) for v in table["n_trades"])
 
 
 def test_compare_html_written(tmp_path: Path) -> None:
