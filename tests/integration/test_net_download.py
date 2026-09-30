@@ -46,9 +46,14 @@ def test_real_download_is_idempotent(tmp_path: Path) -> None:
 
 
 def test_real_instruments_spot_btcusdt(tmp_path: Path) -> None:
-    from tradingv2.data.instruments import load_instrument_rules, save_instrument_rules
-    from tradingv2.data.instruments import extract_instrument_rules, fetch_exchange_info
     import httpx
+
+    from tradingv2.data.instruments import (
+        extract_instrument_rules,
+        fetch_exchange_info,
+        load_instrument_rules,
+        save_instrument_rules,
+    )
 
     with httpx.Client(timeout=30.0) as client:
         raw = fetch_exchange_info(Market.SPOT, client)

@@ -1,0 +1,6 @@
+data:
+  market: spot
+  kind: aggTrades
+  symbol: BTCUSDT
+  start: 2026-08-01
+  end: 2026-08-31

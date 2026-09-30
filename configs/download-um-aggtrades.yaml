@@ -1,7 +1,6 @@
 data:
   market: um
-  kind: klines
+  kind: aggTrades
   symbol: BTCUSDT
-  interval: 1s
   start: 2026-08-01
   end: 2026-08-31

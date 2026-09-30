@@ -75,3 +75,19 @@ def test_canonical_dtypes() -> None:
 def test_empty_file_raises() -> None:
     with pytest.raises(DataParseError):
         parse_aggtrades_csv(b"", Market.SPOT, file="empty.csv")
+
+
+def test_large_file_is_fast() -> None:
+    import time
+
+    n = 200_000
+    lines = [
+        f"{i},0.01633102,4.70443515,1,1,{1498793709153 + i},true".encode()
+        for i in range(n)
+    ]
+    payload = b"\n".join(lines) + b"\n"
+    start = time.perf_counter()
+    df = parse_aggtrades_csv(payload, Market.UM, file="big.csv")
+    elapsed = time.perf_counter() - start
+    assert df.height == n
+    assert elapsed < 5.0, f"parsing {n} rows took {elapsed:.1f}s"
