@@ -106,3 +106,72 @@ def signal_flow(
         + [SignalEvent(ts_ns=int(ts[i]), direction="sell") for i in below_idx]
     )
     return sorted(events, key=lambda e: e.ts_ns)
+
+
+def signal_momentum(
+    close: pl.Series, ts_ns: pl.Series, lookback: int, threshold: float
+) -> list[SignalEvent]:
+    """Time-series momentum: events when the lookback return crosses ±threshold.
+
+    Positive momentum expects continuation (buy on upside break, sell on
+    downside break) — the opposite of mean reversion.
+    """
+    values = close.to_numpy()
+    lookback_ret = np.full(len(values), np.nan)
+    if len(values) > lookback:
+        lookback_ret[lookback:] = values[lookback:] / values[:-lookback] - 1.0
+    below_idx, above_idx = _crossings(lookback_ret, -threshold, threshold)
+    t = ts_ns.to_numpy()
+    events = (
+        [SignalEvent(ts_ns=int(t[i]), direction="buy") for i in above_idx]
+        + [SignalEvent(ts_ns=int(t[i]), direction="sell") for i in below_idx]
+    )
+    return sorted(events, key=lambda e: e.ts_ns)
+
+
+def signal_funding_extreme(
+    funding_ts: pl.Series, funding_rate: pl.Series, threshold: float
+) -> list[SignalEvent]:
+    """Funding-rate extremes as crowding signals (mean reversion).
+
+    A large positive rate = crowded longs paying: sell. A large negative
+    rate = crowded shorts: buy. Events fire at each funding settlement whose
+    rate crosses the threshold (one per settlement — no crossing logic).
+    """
+    t = funding_ts.to_numpy()
+    r = funding_rate.to_numpy()
+    events: list[SignalEvent] = []
+    for i in range(len(t)):
+        rate = r[i]
+        if rate != rate:
+            continue
+        if rate >= threshold:
+            events.append(SignalEvent(ts_ns=int(t[i]), direction="sell"))
+        elif rate <= -threshold:
+            events.append(SignalEvent(ts_ns=int(t[i]), direction="buy"))
+    return events
+
+
+def signal_basis(
+    spot_close: pl.Series, perp_close: pl.Series, ts_ns: pl.Series, window: int, entry_z: float
+) -> list[SignalEvent]:
+    """Spot-perp basis z-score extremes (perp convergence, single-leg proxy).
+
+    Basis above its rolling mean (perp overpriced) → sell the perp; below →
+    buy. The hedge leg (spot) is out of scope for the single-instrument
+    engine: this measures the perp-side timing.
+    """
+    spot = spot_close.to_numpy()
+    perp = perp_close.to_numpy()
+    with np.errstate(divide="ignore", invalid="ignore"):
+        basis = perp / spot - 1.0
+    basis_series = pl.Series(np.where(np.isfinite(basis), basis, np.nan))
+    z = zscore(basis_series, window).to_numpy()
+    # basis extreme HIGH → sell perp (mean reversion of the basis)
+    below_idx, above_idx = _crossings(z, -entry_z, entry_z)
+    t = ts_ns.to_numpy()
+    events = (
+        [SignalEvent(ts_ns=int(t[i]), direction="sell") for i in above_idx]
+        + [SignalEvent(ts_ns=int(t[i]), direction="buy") for i in below_idx]
+    )
+    return sorted(events, key=lambda e: e.ts_ns)
