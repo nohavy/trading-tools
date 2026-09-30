@@ -28,12 +28,20 @@ def ema(values: pl.Series, span: int) -> pl.Series:
 
 
 def zscore(values: pl.Series, window: int) -> pl.Series:
-    """Rolling z-score of the values over a bar-count window."""
+    """Rolling z-score over direct per-window sums (population std, ddof=0)."""
     if window <= 0:
         raise ValueError(f"window must be positive, got {window}")
-    mean = values.rolling_mean(window, min_samples=window)
-    std = values.rolling_std(window, ddof=0, min_samples=window)
-    return (values - mean) / std
+    v = values.to_numpy()
+    n = len(v)
+    out = np.full(n, np.nan)
+    if n >= window:
+        windows = np.lib.stride_tricks.sliding_window_view(v, window)
+        mean = windows.mean(axis=1)
+        std = windows.std(axis=1)
+        x = v[window - 1 :]
+        safe_std = np.where(std > 0, std, 1.0)
+        out[window - 1 :] = np.where(std > 0, (x - mean) / safe_std, np.nan)
+    return pl.Series(out)
 
 
 def vwap_session(ts_ns: pl.Series, price: pl.Series, volume: pl.Series) -> pl.Series:
@@ -48,11 +56,18 @@ def vwap_session(ts_ns: pl.Series, price: pl.Series, volume: pl.Series) -> pl.Se
 
 
 def realized_vol(close: pl.Series, window: int) -> pl.Series:
-    """Rolling std (population) of simple returns over a bar-count window."""
+    """Rolling std (population) of simple returns over direct windows."""
     if window <= 0:
         raise ValueError(f"window must be positive, got {window}")
-    returns = close.pct_change()
-    return returns.rolling_std(window, ddof=0, min_samples=window)
+    v = close.to_numpy()
+    n = len(v)
+    out = np.full(n, np.nan)
+    if n >= 2:
+        returns = np.diff(v) / v[:-1]
+        if len(returns) >= window:
+            windows = np.lib.stride_tricks.sliding_window_view(returns, window)
+            out[window:] = windows.std(axis=1)
+    return pl.Series(out)
 
 
 def flow_imbalance(volume: pl.Series, taker_buy_volume: pl.Series, window: int) -> pl.Series:
