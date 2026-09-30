@@ -18,7 +18,9 @@ def make_up(n: int = 10) -> tuple[np.ndarray, np.ndarray]:
 
 def test_edge_by_session_labels() -> None:
     """Events labeled by UTC hour bucket: stats per bucket are consistent."""
-    ts, close = make_up(n=25 * 3600 + 1)  # 25 hours of up-drift
+    n = 25 * 3600 + 1  # 25 hours
+    ts = np.arange(n, dtype=np.int64) * S
+    close = 100.0 * np.power(1.01, np.arange(n, dtype=np.float64))  # +1%/s: 100 bps everywhere
     # buy events in sessions 0-8, 8-16, 16-24 (hours 0, 10, 20)
     events = [
         SignalEvent(ts_ns=0, direction="buy"),
@@ -34,6 +36,7 @@ def test_edge_by_session_labels() -> None:
         assert len(label_rows) == 1
         row = label_rows[0]
         assert row["n"] == 1
+        assert row["mean_bps"] is not None
         assert row["mean_bps"] == pytest.approx(100.0)  # +1/100 up drift everywhere
         assert row["edges"]["c"] == pytest.approx(50.0)
 

@@ -6,6 +6,7 @@ not worth a backtest.
 """
 
 import json
+from collections.abc import Callable
 from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import Any
@@ -255,7 +256,7 @@ def edge_by_regime(
     close: np.ndarray,
     horizons_ns: list[int],
     cost_pairs: list[tuple[str, float]],
-    label_fn,
+    label_fn: "Callable[[int], str]",
 ) -> dict[str, list[dict[str, object]]]:
     """Edge table per regime: events grouped by label_fn(event_ts).
 
