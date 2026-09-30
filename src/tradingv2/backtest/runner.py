@@ -7,7 +7,7 @@ import polars as pl
 
 from tradingv2.backtest.config import BacktestConfig, load_backtest_config
 from tradingv2.backtest.engine import Engine, EngineResult
-from tradingv2.core.types import PriceBar
+from tradingv2.core.types import FundingEvent, PriceBar
 from tradingv2.costs.fees import FeeSchedule
 from tradingv2.costs.latency import LatencyModel
 from tradingv2.costs.slippage import SlippageModel
@@ -112,8 +112,31 @@ def run_backtest(config_path: Path, data_root: Path, runs_root: Path) -> Path:
         tape=tape,
     )
     engine = Engine(exchange=exchange, strategy=strategy, bars=bars)
-    result = engine.run()
-    return _record(cfg, result, data_root, runs_root)
+    interval_ns = parse_interval_ns(cfg.data.interval or "1s")
+    result = engine.run(
+        funding_events=_load_funding(cfg, data_root) if cfg.account.type == "margin" else None
+    )
+    from tradingv2.metrics.compute import compute_metrics, metrics_to_json
+
+    metrics = compute_metrics(
+        pl.DataFrame(
+            {
+                "ts_ns": [ts for ts, _ in result.equity_curve],
+                "equity": [e for _, e in result.equity_curve],
+            }
+        ),
+        result.round_trips,
+        interval_ns,
+    )
+    return _record(
+        cfg,
+        result,
+        metrics,
+        data_root,
+        runs_root,
+        metrics_json=metrics_to_json(metrics),
+        render=True,
+    )
 
 
 def _rules_for(cfg: BacktestConfig) -> InstrumentRules:
@@ -131,7 +154,30 @@ def _rules_for(cfg: BacktestConfig) -> InstrumentRules:
         )
 
 
-def _record(cfg: BacktestConfig, result: EngineResult, data_root: Path, runs_root: Path) -> Path:
+def _load_funding(cfg: BacktestConfig, data_root: Path) -> list[FundingEvent] | None:
+    """Load funding events from the catalogue when the account is a margin one."""
+    directory = data_root / "parquet" / cfg.data.market / "fundingRate" / cfg.data.symbol
+    files = sorted(directory.glob("*.parquet")) if directory.is_dir() else []
+    if not files:
+        return None
+    frames = [pl.read_parquet(path) for path in files]
+    df = pl.concat(frames).sort("ts_ns")
+    return [
+        FundingEvent(ts_ns=int(row["ts_ns"]), rate=float(row["rate"]))
+        for row in df.iter_rows(named=True)
+    ]
+
+
+def _record(
+    cfg: BacktestConfig,
+    result: EngineResult,
+    metrics,  # noqa: ANN001 - MetricsReport
+    data_root: Path,
+    runs_root: Path,
+    *,
+    metrics_json: dict,  # noqa: ANN001
+    render: bool = False,
+) -> Path:
     stamp = datetime.now(UTC).strftime("%Y%m%d-%H%M%S-%f")
     run_dir = runs_root / f"{stamp}-{cfg.strategy.name}"
     run_dir.mkdir(parents=True, exist_ok=True)
@@ -180,6 +226,7 @@ def _record(cfg: BacktestConfig, result: EngineResult, data_root: Path, runs_roo
         "final_equity": result.final_equity,
     }
     (run_dir / "summary.json").write_text(json.dumps(summary, indent=2), encoding="utf-8")
+    (run_dir / "metrics.json").write_text(json.dumps(metrics_json, indent=2), encoding="utf-8")
     catalog_path = data_root / "catalog.json"
     manifest = {
         "created_at": datetime.now(UTC).isoformat(),
@@ -190,6 +237,10 @@ def _record(cfg: BacktestConfig, result: EngineResult, data_root: Path, runs_roo
         "engine_version": 1,
     }
     (run_dir / "manifest.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
+    if render:
+        from tradingv2.report.render import render_report
+
+        render_report(run_dir)
     return run_dir
 
 

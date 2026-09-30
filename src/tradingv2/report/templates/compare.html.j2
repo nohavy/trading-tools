@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>tradingv2 — comparaison de {{ n_runs }} runs</title>
+<style>
+body { font-family: system-ui, sans-serif; margin: 24px; color: #111; background: #fafafa; }
+h1 { font-size: 20px; }
+table { border-collapse: collapse; margin: 12px 0; }
+td, th { border: 1px solid #ddd; padding: 4px 12px; font-size: 14px; }
+th { background: #eee; }
+tr:first-child td { font-weight: bold; }
+</style>
+</head>
+<body>
+<h1>Comparaison de {{ n_runs }} runs</h1>
+<table>
+<tr><th>Métrique</th>{% for name in names %}<th>{{ name }}</th>{% endfor %}</tr>
+{% for row in rows %}
+<tr><td>{{ row.label }}</td>{% for value in row.vals %}<td>{{ value }}</td>{% endfor %}</tr>
+{% endfor %}
+</table>
+</body>
+</html>
