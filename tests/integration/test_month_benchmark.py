@@ -1,6 +1,5 @@
 """Benchmark: one month of 1s bars + tape must run under 10 minutes (SC-003)."""
 
-from datetime import date
 from pathlib import Path
 
 import polars as pl
@@ -8,7 +7,7 @@ import pytest
 
 from tradingv2.backtest.engine import Engine
 from tradingv2.config import Market
-from tradingv2.core.types import PriceBar, Side
+from tradingv2.core.types import PriceBar
 from tradingv2.costs.fees import FeeSchedule
 from tradingv2.costs.latency import LatencyModel
 from tradingv2.costs.slippage import SlippageModel
@@ -44,7 +43,9 @@ def test_month_bars_with_tape_under_ten_minutes(tmp_path: Path) -> None:
         for row in bars_df.iter_rows(named=True)
     ]
     exchange = SimulatedExchange(
-        rules=InstrumentRules(symbol="BTCUSDT", market=Market.SPOT, tick_size=0.01, step_size=1e-5, min_notional=5.0),
+        rules=InstrumentRules(
+            symbol="BTCUSDT", market=Market.SPOT, tick_size=0.01, step_size=1e-5, min_notional=5.0
+        ),
         account=MarginAccount(balance=1_000.0, leverage=5),
         fees=FeeSchedule(maker_bps=2, taker_bps=5),
         slippage=SlippageModel(bps=0.5),
@@ -58,4 +59,6 @@ def test_month_bars_with_tape_under_ten_minutes(tmp_path: Path) -> None:
     elapsed = time.perf_counter() - start
     assert result.n_bars == bars_df.height
     assert elapsed < 600, f"one month took {elapsed:.0f}s (limit 600s)"
-    print(f"\nmonth benchmark: {bars_df.height:,} bars, {tape_df.height:,} trades -> {elapsed:.1f}s")
+    print(
+        f"\nmonth benchmark: {bars_df.height:,} bars, {tape_df.height:,} trades -> {elapsed:.1f}s"
+    )
