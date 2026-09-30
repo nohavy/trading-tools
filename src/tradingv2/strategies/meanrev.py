@@ -28,6 +28,7 @@ class MeanRevZScore(Strategy):
         self._stop_bps = stop_bps
         self._max_hold_bars = max_hold_bars
         self._stop_order_id: int | None = None
+        self._exit_pending_id: int | None = None
         self._hold_count = 0
 
     def on_bar(self, ctx: Context, bar: PriceBar) -> None:
@@ -81,5 +82,20 @@ class MeanRevZScore(Strategy):
         if self._stop_order_id is not None:
             ctx.cancel(self._stop_order_id)
             self._stop_order_id = None
-        ctx.submit_market(Side.SELL if position > 0 else Side.BUY, qty=abs(position))
+        self._exit_pending_id = ctx.submit_market(
+            Side.SELL if position > 0 else Side.BUY, qty=abs(position)
+        )
         self._hold_count = 0
+
+    def on_fill(self, ctx: Context, event: object) -> None:
+        """Bracket guard: when the stop closes the position, cancel the pending
+        exit order so the position is not flipped involuntarily."""
+        from tradingv2.execution.exchange import FillEvent
+
+        assert isinstance(event, FillEvent)
+        del event
+        if ctx.exchange.position_qty == 0.0:
+            if self._exit_pending_id is not None:
+                ctx.cancel(self._exit_pending_id)
+                self._exit_pending_id = None
+            self._stop_order_id = None

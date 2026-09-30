@@ -124,6 +124,7 @@ class SimulatedExchange:
                     heapify(self._scheduled)
                 return
         order.transition(OrderStatus.CANCELED)
+        self._purge_terminal_from_queues(order)
 
     # -- clock ---------------------------------------------------------------
 
@@ -264,37 +265,71 @@ class SimulatedExchange:
             else:
                 self._active_limits.append(order)
 
-    def on_bar_close(self, bar: PriceBar) -> list[FillEvent]:
-        """Bars-only mode: evaluate queued orders against the bar that closes.
+    def _purge_terminal_from_queues(self, order: Order) -> None:
+        """Remove a terminal order from the bars-only queues (it must not fire)."""
+        self._bar_market = [o for o in self._bar_market if o.id != order.id]
+        self._active_limits = [o for o in self._active_limits if o.id != order.id]
+        self._active_stops = [o for o in self._active_stops if o.id != order.id]
 
-        First advances time to the bar close (arrivals and scheduled fills),
-        then evaluates market/limit/stop orders when no tape is loaded:
-        market orders arriving inside the bar's window fill at its open
-        (conservative: up to one interval of staleness) with slippage;
-        limits fill on touch (optimistic) or trade-through (pessimistic);
-        stops trigger on the level being reached, gap opens fill worse.
-        """
-        events = self.advance_to(bar.ts_close_ns)
+    def evaluate_stop_orders(self, bar: PriceBar) -> list[FillEvent]:
+        """Bars-only mode: evaluate active stop orders against the closing bar."""
+        events: list[FillEvent] = []
         if self._tape_ts is not None:
-            return events  # tape mode: fills come from the tape only
+            return events
         self.last_price = bar.close
+        self._active_stops = [o for o in self._active_stops if o.status == OrderStatus.ACTIVE]
+        for order in list(self._active_stops):
+            if order.arrive_ns is not None and order.arrive_ns <= bar.ts_close_ns:
+                event = self._fill_stop_bars(order, bar)
+                if event is not None:
+                    events.append(event)
+        self._active_stops = [o for o in self._active_stops if o.status == OrderStatus.ACTIVE]
+        return events
+
+    def evaluate_limit_orders(self, bar: PriceBar) -> list[FillEvent]:
+        """Bars-only mode: evaluate active limit orders against the closing bar."""
+        events: list[FillEvent] = []
+        if self._tape_ts is not None:
+            return events
+        self._active_limits = [o for o in self._active_limits if o.status == OrderStatus.ACTIVE]
+        for order in list(self._active_limits):
+            if order.arrive_ns is not None and order.arrive_ns <= bar.ts_close_ns:
+                event = self._fill_limit_bars(order, bar)
+                if event is not None:
+                    events.append(event)
+        self._active_limits = [o for o in self._active_limits if o.status == OrderStatus.ACTIVE]
+        return events
+
+    def evaluate_market_orders(self, bar: PriceBar) -> list[FillEvent]:
+        """Bars-only mode: evaluate queued market orders against the closing bar."""
+        events: list[FillEvent] = []
+        if self._tape_ts is not None:
+            return events
+        self._bar_market = [o for o in self._bar_market if o.status == OrderStatus.ACTIVE]
         for order in list(self._bar_market):
             if order.arrive_ns is not None and order.arrive_ns <= bar.ts_close_ns:
                 self._bar_market.remove(order)
                 event = self._fill_market_bars(order, bar)
                 if event is not None:
                     events.append(event)
-        for order in list(self._active_limits):
-            if order.arrive_ns is not None and order.arrive_ns <= bar.ts_close_ns:
-                event = self._fill_limit_bars(order, bar)
-                if event is not None:
-                    events.append(event)
-        for order in list(self._active_stops):
-            if order.arrive_ns is not None and order.arrive_ns <= bar.ts_close_ns:
-                event = self._fill_stop_bars(order, bar)
-                if event is not None:
-                    events.append(event)
+        self._bar_market = [o for o in self._bar_market if o.status == OrderStatus.ACTIVE]
         return events
+
+    def on_bar_close(self, bar: PriceBar) -> list[FillEvent]:
+        """Bars-only mode: evaluate queued orders against the bar that closes.
+
+        First advances time to the bar close (arrivals and scheduled fills),
+        then evaluates stops before limits before market orders. The engine uses
+        the granular evaluators to deliver fills to the strategy between phases
+        (bracket guards can cancel pending exits)."""
+        events = self.advance_to(bar.ts_close_ns)
+        if self._tape_ts is not None:
+            return events  # tape mode: fills come from the tape only
+        return (
+            self.evaluate_stop_orders(bar)
+            + self.evaluate_limit_orders(bar)
+            + self.evaluate_market_orders(bar)
+        )
 
     def _fill_market_bars(self, order: Order, bar: PriceBar) -> FillEvent | None:
         base = bar.open
@@ -313,15 +348,15 @@ class SimulatedExchange:
             order_id=order.id, ts_ns=bar.ts_close_ns, price=price, qty=order.qty,
             fee=fee, role=FillRole.TAKER, side=order.side,
         )
-        order.transition(OrderStatus.FILLED)
-        signed = fill.qty if order.side == Side.BUY else -fill.qty
-        realized = self._tracker.apply(signed, price)
         try:
             self.account.apply_fill(fill)
         except AccountError as exc:
             order.transition(OrderStatus.REJECTED)
             order.reject_reason = str(exc)
             return None
+        order.transition(OrderStatus.FILLED)
+        signed = fill.qty if order.side == Side.BUY else -fill.qty
+        realized = self._tracker.apply(signed, price)
         slippage = self._slippage_cost(base, price, order.qty, order.side)
         return FillEvent(fill=fill, realized_gross=realized, slippage_cost=slippage)
 
@@ -338,17 +373,22 @@ class SimulatedExchange:
             return None
         return self._close_limit_fill(order, bar.ts_close_ns)
 
-    def _close_limit_fill(self, order: Order, ts_ns: int) -> FillEvent:
+    def _close_limit_fill(self, order: Order, ts_ns: int) -> FillEvent | None:
         assert order.limit_price is not None
         fee = self.fees.fee("maker", order.qty * order.limit_price)
         fill = Fill(
             order_id=order.id, ts_ns=ts_ns, price=order.limit_price, qty=order.qty,
             fee=fee, role=FillRole.MAKER, side=order.side,
         )
+        try:
+            self.account.apply_fill(fill)
+        except AccountError as exc:
+            order.transition(OrderStatus.REJECTED)
+            order.reject_reason = str(exc)
+            return None
         order.transition(OrderStatus.FILLED)
         signed = fill.qty if order.side == Side.BUY else -fill.qty
         realized = self._tracker.apply(signed, order.limit_price)
-        self.account.apply_fill(fill)
         return FillEvent(fill=fill, realized_gross=realized, slippage_cost=0.0)
 
     def _fill_stop_bars(self, order: Order, bar: PriceBar) -> FillEvent | None:
@@ -368,10 +408,15 @@ class SimulatedExchange:
             order_id=order.id, ts_ns=bar.ts_close_ns, price=price, qty=order.qty,
             fee=fee, role=FillRole.TAKER, side=order.side,
         )
+        try:
+            self.account.apply_fill(fill)
+        except AccountError as exc:
+            order.transition(OrderStatus.REJECTED)
+            order.reject_reason = str(exc)
+            return None
         order.transition(OrderStatus.FILLED)
         signed = fill.qty if order.side == Side.BUY else -fill.qty
         realized = self._tracker.apply(signed, price)
-        self.account.apply_fill(fill)
         slippage = self._slippage_cost(raw, price, order.qty, order.side)
         return FillEvent(fill=fill, realized_gross=realized, slippage_cost=slippage)
 
@@ -468,9 +513,14 @@ class SimulatedExchange:
             role=FillRole.TAKER,
             side=order.side,
         )
+        try:
+            self.account.apply_fill(fill)
+        except AccountError as exc:
+            order.transition(OrderStatus.REJECTED)
+            order.reject_reason = str(exc)
+            return None
         order.transition(OrderStatus.FILLED)
         realized = self._tracker.apply(fill.qty if order.side == Side.BUY else -fill.qty, vwap)
-        self.account.apply_fill(fill)
         slippage = self._slippage_cost(scheduled.reference_price, vwap, consumed, order.side)
         self.last_price = vwap
         return FillEvent(fill=fill, realized_gross=realized, slippage_cost=slippage)
@@ -531,10 +581,15 @@ class SimulatedExchange:
             role=FillRole.MAKER,
             side=order.side,
         )
+        try:
+            self.account.apply_fill(fill)
+        except AccountError as exc:
+            order.transition(OrderStatus.REJECTED)
+            order.reject_reason = str(exc)
+            return None
         order.transition(OrderStatus.FILLED)
         signed = fill.qty if order.side == Side.BUY else -fill.qty
         realized = self._tracker.apply(signed, order.limit_price)
-        self.account.apply_fill(fill)
         self.last_price = market_price
         return FillEvent(fill=fill, realized_gross=realized, slippage_cost=0.0)
 
@@ -578,10 +633,15 @@ class SimulatedExchange:
             role=FillRole.TAKER,
             side=order.side,
         )
+        try:
+            self.account.apply_fill(fill)
+        except AccountError as exc:
+            order.transition(OrderStatus.REJECTED)
+            order.reject_reason = str(exc)
+            return None
         order.transition(OrderStatus.FILLED)
         signed = fill.qty if order.side == Side.BUY else -fill.qty
         realized = self._tracker.apply(signed, trigger_price)
-        self.account.apply_fill(fill)
         slippage = self._slippage_cost(
             scheduled.reference_price, trigger_price, order.qty, order.side
         )

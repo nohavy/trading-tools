@@ -35,19 +35,31 @@ class MarginAccount:
         return self._tracker.entry
 
     def apply_fill(self, fill: Fill) -> float:
-        """Apply one fill; return the realized gross PnL on position reduction."""
+        """Apply one fill; return the realized gross PnL on position reduction.
+
+        The margin check runs BEFORE any mutation: on refusal the account is
+        exactly as it was before the call.
+        """
         signed_qty = fill.qty if fill.side == Side.BUY else -fill.qty
+        self._check_margin_prospective(signed_qty, fill.price)
         self.balance -= fill.fee
         realized = self._tracker.apply(signed_qty, fill.price)
         self.balance += realized
-        self._check_margin(fill.price)
         return realized
 
-    def _check_margin(self, mark_price: float) -> None:
-        margin_used = abs(self.position) * self.entry_price / self.leverage
-        if margin_used > self.equity(mark_price):
+    def _check_margin_prospective(self, signed_qty: float, price: float) -> None:
+        """Reject fills that would need more margin than the equity allows.
+
+        Only position INCREASES consume margin; reductions release it, so the
+        check uses the post-fill entry cost of the added size.
+        """
+        increase = max(0.0, abs(self.position + signed_qty) - abs(self.position))
+        if increase <= 0:
+            return
+        used = (abs(self.position) * self.entry_price + increase * price) / self.leverage
+        if used > self.equity(price):
             raise AccountError(
-                f"insufficient margin: used {margin_used} > equity {self.equity(mark_price)}"
+                f"insufficient margin: used {used} > equity {self.equity(price)}"
             )
 
     def apply_funding(self, ts_ns: int, rate: float, mark_price: float) -> float:

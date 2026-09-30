@@ -196,12 +196,18 @@ class Engine:
                         continue
                 bar = self._bar_by_close[event.ts]
                 self._closed_bars.append(bar)
-                # bars-only mode: evaluate queued orders on the closing bar
-                bar_events = self.exchange.on_bar_close(bar)
-                for fill_event in bar_events:
-                    self._fill_events.append(fill_event)
-                    self.strategy.on_fill(ctx, fill_event)
-                    self._account_fill(ctx, fill_event)
+                # bars-only mode: stops fire first, then limits, then market
+                # orders — each phase delivers fills so the strategy's bracket
+                # guard can cancel pending exits between phases
+                for evaluate in (
+                    self.exchange.evaluate_stop_orders,
+                    self.exchange.evaluate_limit_orders,
+                    self.exchange.evaluate_market_orders,
+                ):
+                    for fill_event in evaluate(bar):
+                        self._fill_events.append(fill_event)
+                        self.strategy.on_fill(ctx, fill_event)
+                        self._account_fill(ctx, fill_event)
                 self._equity_curve.append((event.ts, self.exchange.account.equity(bar.close)))
                 self.strategy.on_bar(ctx, bar)
             elif event.priority == 2:  # timer
