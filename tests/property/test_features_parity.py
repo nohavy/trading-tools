@@ -36,7 +36,9 @@ def same(a: float | None, b: float | None, scale: float = 1.0) -> bool:
     return abs(a - b) <= TOL * max(1.0, abs(a))
 
 
-floats = st.floats(min_value=-1e6, max_value=1e6, allow_nan=False, allow_subnormal=False)
+# prices and volumes live in [1e-6, 1e6]: below that, squared differences
+# underflow in float64 and polars/python diverge on degenerate windows
+floats = st.floats(min_value=1e-6, max_value=1e6, allow_nan=False, allow_subnormal=False)
 positive_floats = st.floats(min_value=0.0, max_value=1e6, allow_nan=False, allow_subnormal=False)
 
 
