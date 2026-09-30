@@ -336,7 +336,7 @@ def edge_sweep(
         score = None
         for row in rows:
             if row["horizon_s"] == target_horizon_s:
-                score = row["mean_bps"]  # type: ignore[assignment]
+                score = row["mean_bps"]
                 break
         entries.append(
             EdgeSweepEntry(

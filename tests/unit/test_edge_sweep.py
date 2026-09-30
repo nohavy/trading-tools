@@ -78,7 +78,7 @@ def test_edge_sweep_few_events_flag(tmp_path: Path) -> None:
 
 def test_edge_sweep_deterministic_and_writes_html(tmp_path: Path) -> None:
     make_env(tmp_path)
-    grid = {"window": [3, 5]}
+    grid: dict[str, list[float | int]] = {"window": [3, 5]}
     runs = tmp_path / "runs"
     r1 = edge_sweep(write_research(tmp_path), grid, data_root=tmp_path, runs_root=runs)
     r2 = edge_sweep(write_research(tmp_path), grid, data_root=tmp_path, runs_root=runs)

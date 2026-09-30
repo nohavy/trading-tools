@@ -39,7 +39,9 @@ def test_edge_by_session_labels() -> None:
         assert row["n"] == 1
         assert row["mean_bps"] is not None
         assert row["mean_bps"] == pytest.approx(1.0)  # +1 bp/s drift everywhere
-        assert row["edges"]["c"] == pytest.approx(1.0 - 50.0)
+        edges = row["edges"]
+        assert isinstance(edges, dict)
+        assert edges["c"] == pytest.approx(1.0 - 50.0)
 
 
 def test_edge_by_regime_splits_statistics() -> None:
