@@ -71,6 +71,10 @@ class SimulatedExchange:
     _tracker: PositionTracker = field(default_factory=PositionTracker, init=False, repr=False)
 
     def __post_init__(self) -> None:
+        if self.limit_fill_mode not in ("pessimistic", "optimistic"):
+            raise ValueError(
+                f"invalid limit_fill_mode '{self.limit_fill_mode}': expected pessimistic|optimistic"
+            )
         self.last_price: float | None = None
         self._tape_ts: np.ndarray[tuple[int], np.dtype[np.int64]] | None = None
         self._tape_price: np.ndarray[tuple[int], np.dtype[np.float64]] | None = None
@@ -130,7 +134,10 @@ class SimulatedExchange:
             _, _, scheduled = heappop(self._scheduled)
             if scheduled.order.status != OrderStatus.ACTIVE:
                 continue
-            event = self._execute_market(scheduled)
+            if scheduled.order.type == OrderType.MARKET:
+                event = self._execute_market(scheduled)
+            else:
+                event = self._execute_limit(scheduled)
             if event is not None:
                 events.append(event)
         return events
@@ -177,6 +184,8 @@ class SimulatedExchange:
         order.transition(OrderStatus.ACTIVE)
         if order.type == OrderType.MARKET:
             self._schedule_market(order)
+        else:
+            self._schedule_limit(order)
 
     def _would_cross(self, order: Order) -> bool:
         assert order.limit_price is not None
@@ -285,3 +294,58 @@ class SimulatedExchange:
             return 0.0
         sign = 1.0 if side == Side.BUY else -1.0
         return (fill_price - reference) * qty * sign
+
+    # -- limit fills on the tape ---------------------------------------------
+
+    def _schedule_limit(self, order: Order) -> None:
+        assert self._tape_ts is not None
+        assert self._tape_price is not None
+        assert order.arrive_ns is not None
+        assert order.limit_price is not None
+        first = self._first_limit_index(order.arrive_ns, order.side, order.limit_price)
+        if first is None:
+            return  # rests until the market trades through the level
+        reference = self._reference_price()
+        self._seq += 1
+        scheduled = _ScheduledFill(order, first, order.qty, reference)
+        heappush(self._scheduled, (int(self._tape_ts[first]), self._seq, scheduled))
+
+    def _first_limit_index(self, from_ns: int, side: Side, limit: float) -> int | None:
+        assert self._tape_ts is not None
+        assert self._tape_price is not None
+        lo = int(np.searchsorted(self._tape_ts, from_ns, side="left"))
+        if lo >= len(self._tape_ts):
+            return None
+        prices = self._tape_price[lo:]
+        if side == Side.BUY:
+            mask = prices < limit if self.limit_fill_mode == "pessimistic" else prices <= limit
+        else:
+            mask = prices > limit if self.limit_fill_mode == "pessimistic" else prices >= limit
+        indices = np.nonzero(mask)[0]
+        if indices.size == 0:
+            return None
+        return lo + int(indices[0])
+
+    def _execute_limit(self, scheduled: _ScheduledFill) -> FillEvent | None:
+        assert self._tape_ts is not None
+        assert self._tape_price is not None
+        order = scheduled.order
+        assert order.limit_price is not None
+        fill_ts = int(self._tape_ts[scheduled.start_idx])
+        market_price = float(self._tape_price[scheduled.start_idx])
+        fee = self.fees.fee("maker", order.qty * order.limit_price)
+        fill = Fill(
+            order_id=order.id,
+            ts_ns=fill_ts,
+            price=order.limit_price,
+            qty=order.qty,
+            fee=fee,
+            role=FillRole.MAKER,
+            side=order.side,
+        )
+        order.transition(OrderStatus.FILLED)
+        signed = fill.qty if order.side == Side.BUY else -fill.qty
+        realized = self._tracker.apply(signed, order.limit_price)
+        self.account.apply_fill(fill)
+        self.last_price = market_price
+        return FillEvent(fill=fill, realized_gross=realized, slippage_cost=0.0)
