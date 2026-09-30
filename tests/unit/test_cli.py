@@ -52,6 +52,12 @@ def test_cli_instruments_requires_options() -> None:
     assert result.exit_code != 0
 
 
+def test_cli_backtest_run_missing_config(tmp_path: Path) -> None:
+    result = runner.invoke(app, ["backtest", "run", "--config", str(tmp_path / "nope.yaml")])
+    assert result.exit_code == 2
+    assert "not found" in result.output
+
+
 def test_cli_check_clean_dataset_exits_zero(tmp_path: Path) -> None:
     _write_bars(tmp_path, clean=True)
     result = _invoke_check(tmp_path)

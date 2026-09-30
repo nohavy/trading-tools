@@ -1,5 +1,6 @@
 """tv2 command line interface."""
 
+import json
 from collections.abc import Callable
 from datetime import date
 from pathlib import Path
@@ -9,6 +10,7 @@ import httpx
 import polars as pl
 import typer
 
+from tradingv2.backtest.runner import run_backtest
 from tradingv2.config import ConfigError, DataKind, Market, load_config
 from tradingv2.data.convert import parse_interval_ns
 from tradingv2.data.instruments import (
@@ -97,6 +99,26 @@ def data_check(
         if len(anomalies) > 50:
             typer.echo(f"... and {len(anomalies) - 50} more")
         raise typer.Exit(code=1)
+
+    _run_or_exit(action)
+
+
+@backtest_app.command("run")
+def backtest_run(
+    config: Annotated[Path, typer.Option(help="Backtest YAML configuration file")],
+    data_root: Annotated[Path, typer.Option(help="Data root directory")] = DATA_ROOT,
+    runs_root: Annotated[Path, typer.Option(help="Runs output directory")] = Path("runs"),
+) -> None:
+    """Run a backtest and write its artifacts under runs/."""
+
+    def action() -> None:
+        run_dir = run_backtest(config, data_root=data_root, runs_root=runs_root)
+        summary = json.loads((run_dir / "summary.json").read_text(encoding="utf-8"))
+        typer.echo(f"run: {run_dir}")
+        typer.echo(
+            f"bars={summary['n_bars']} fills={summary['n_fills']}"
+            f" final_equity={summary['final_equity']:.2f}"
+        )
 
     _run_or_exit(action)
 
