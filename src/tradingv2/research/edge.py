@@ -13,7 +13,6 @@ import numpy as np
 import polars as pl
 import yaml
 
-from tradingv2.data.convert import parse_interval_ns
 from tradingv2.research.signals import SignalEvent
 
 
@@ -139,7 +138,7 @@ def edge_table(
     return rows
 
 
-def _signal_events(config: dict, bars: pl.DataFrame) -> list[SignalEvent]:
+def _signal_events(config: dict[str, object], bars: pl.DataFrame) -> list[SignalEvent]:
     from tradingv2.research.signals import signal_breakout, signal_flow, signal_meanrev
 
     signal = config["signal"]
@@ -165,7 +164,7 @@ def _signal_events(config: dict, bars: pl.DataFrame) -> list[SignalEvent]:
     raise ValueError(f"unknown signal '{name}' (known: meanrev, breakout, flow)")
 
 
-def _load_bars(config: dict, data_root: Path) -> pl.DataFrame:
+def _load_bars(config: dict[str, object], data_root: Path) -> pl.DataFrame:
     data = config["data"]
     interval = data["interval"]
     directory = data_root / "parquet" / data["market"] / "klines" / data["symbol"] / interval
@@ -175,7 +174,9 @@ def _load_bars(config: dict, data_root: Path) -> pl.DataFrame:
     from datetime import date, timedelta
 
     lower = int((date.fromisoformat(str(data["start"])) - _EPOCH).total_seconds() * 1e9)
-    upper = int((date.fromisoformat(str(data["end"])) - _EPOCH + timedelta(days=1)).total_seconds() * 1e9) - 1
+    upper = int(
+        (date.fromisoformat(str(data["end"])) - _EPOCH + timedelta(days=1)).total_seconds() * 1e9
+    ) - 1
     frames = [pl.read_parquet(path) for path in files]
     df = pl.concat(frames).sort("ts_open_ns")
     return df.filter((pl.col("ts_open_ns") >= lower) & (pl.col("ts_open_ns") <= upper))
@@ -193,8 +194,9 @@ def run_edge_study(config_path: Path, data_root: Path, runs_root: Path) -> Path:
     events = _signal_events(config, bars)
     ts = bars["ts_open_ns"].to_numpy()
     close = bars["close"].to_numpy()
-    interval_ns = parse_interval_ns(config["data"]["interval"])
-    horizons_ns = [int(h) * 1_000_000_000 for h in config.get("horizons_s", [1, 5, 15, 30, 60, 300, 900])]
+    default_horizons = [1, 5, 15, 30, 60, 300, 900]
+    horizons = config.get("horizons_s", default_horizons)
+    horizons_ns = [int(h) * 1_000_000_000 for h in horizons]
     cost_pairs = [
         (pair["name"], float(pair["maker_bps"]) + float(pair["taker_bps"]))
         for pair in config.get("cost_pairs", [])

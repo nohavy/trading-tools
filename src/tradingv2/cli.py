@@ -187,7 +187,10 @@ def _fmt_edge_row(row: dict[str, object]) -> str:
     mean_str = f"{mean:>9.2f}" if mean is not None else "        n/a"
     median_str = f"{median:>9.2f}" if median is not None else "        n/a"
     hit_str = f"{hit:>8.1%}" if hit is not None else "     n/a"
-    return f"{row['horizon_s']:>9}  {row['n_defined']:>5}  {mean_str}  {median_str}  {hit_str}  {edges_str}"
+    return (
+        f"{row['horizon_s']:>9}  {row['n_defined']:>5}  {mean_str}  {median_str}"
+        f"  {hit_str}  {edges_str}"
+    )
 
 
 @backtest_app.command("sweep")
@@ -214,7 +217,9 @@ def backtest_sweep(
         typer.echo(f"sweep: {len(result.entries)} configurations -> {result.html_path}")
         for entry in result.entries[:5]:
             flag = " (trop peu de trades)" if entry.few_trades else ""
-            expectancy = f"{entry.expectancy_bps:.2f}" if entry.expectancy_bps is not None else "n/a"
+            expectancy = (
+                f"{entry.expectancy_bps:.2f}" if entry.expectancy_bps is not None else "n/a"
+            )
             typer.echo(f"  {entry.params} -> espérance {expectancy} bps{flag}")
 
     _run_or_exit(action)
@@ -245,7 +250,9 @@ def backtest_walkforward(
             config, parsed, train_bars=train_bars, test_bars=test_bars,
             data_root=data_root, runs_root=runs_root, workers=workers,
         )
-        typer.echo(f"walk-forward: {len(result.folds)} folds, {result.pct_positive_folds:.0%} positifs")
+        typer.echo(
+            f"walk-forward: {len(result.folds)} folds, {result.pct_positive_folds:.0%} positifs"
+        )
         typer.echo(f"OOS: {result.oos}")
         for fold in result.folds:
             typer.echo(
@@ -306,8 +313,12 @@ def backtest_stress(
 @validate_app.command("run")
 def validate_run(
     run: Annotated[Path, typer.Argument(help="Run directory with metrics.json")],
-    holdout_start: Annotated[str | None, typer.Option(help="Locked period start (YYYY-MM-DD)")] = None,
-    holdout_end: Annotated[str | None, typer.Option(help="Locked period end (YYYY-MM-DD)")] = None,
+    holdout_start: Annotated[
+        str | None, typer.Option(help="Locked period start (YYYY-MM-DD)")
+    ] = None,
+    holdout_end: Annotated[
+        str | None, typer.Option(help="Locked period end (YYYY-MM-DD)")
+    ] = None,
 ) -> None:
     """Compute the go/no-go verdict from a run's metrics."""
 
@@ -355,9 +366,9 @@ def validate_run(
 @compare_app.command("runs")
 def compare_runs_cmd(
     runs: Annotated[list[Path], typer.Argument(help="Run directories to compare")],
-    runs_root: Annotated[Path, typer.Option(help="Where to write the comparison HTML")] = Path(  # noqa: E501
-        "runs"
-    ),
+    runs_root: Annotated[
+        Path, typer.Option(help="Where to write the comparison HTML")
+    ] = Path("runs"),
 ) -> None:
     """Compare run artifacts: metrics table side by side + HTML."""
     for run in runs:
@@ -376,7 +387,8 @@ def compare_runs_cmd(
         "net_total": "Net", "fee_drag": "Drag",
     }
     for key, values in table.items():
-        typer.echo(f"{labels.get(key, key):>16}: " + "  ".join(values))
+        label = labels.get(key, key)
+        typer.echo(f"{label:>16}: " + "  ".join(values))
     html = compare_runs(runs, runs_root=runs_root)
     typer.echo(f"comparaison écrite: {html}")
 
