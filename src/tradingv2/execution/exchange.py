@@ -92,6 +92,8 @@ class SimulatedExchange:
         self._bar_market: list[Order] = []
         self._active_limits: list[Order] = []
         self._active_stops: list[Order] = []
+        self._timers: set[int] = set()
+        self._next_order_id = 1
         self._seq = 0
 
     # -- submission ----------------------------------------------------------
@@ -146,6 +148,42 @@ class SimulatedExchange:
             if event is not None:
                 events.append(event)
         return events
+
+    # -- timers and order ids ------------------------------------------------
+
+    def schedule_timer(self, ts_ns: int) -> None:
+        """Register a timer deadline (fired by the engine at ts_ns)."""
+        self._timers.add(ts_ns)
+
+    def pop_timer(self, ts_ns: int) -> None:
+        """Consume a timer deadline."""
+        self._timers.discard(ts_ns)
+
+    def _new_order(
+        self,
+        symbol: str,
+        side: Side,
+        type: OrderType,  # noqa: A002 - domain name
+        qty: float,
+        submitted_ns: int,
+        limit_price: float | None = None,
+        stop_price: float | None = None,
+        post_only: bool = False,
+    ) -> Order:
+        """Create an order with an exchange-assigned id."""
+        order = Order(
+            id=self._next_order_id,
+            symbol=symbol,
+            side=side,
+            type=type,
+            qty=qty,
+            submitted_ns=submitted_ns,
+            limit_price=limit_price,
+            stop_price=stop_price,
+            post_only=post_only,
+        )
+        self._next_order_id += 1
+        return order
 
     # -- internals -----------------------------------------------------------
 
