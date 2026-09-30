@@ -78,8 +78,10 @@ def test_walkforward_end_to_end(tmp_path: Path) -> None:
     assert len(result.folds) == 3
     for fold in result.folds:
         assert fold.best_params["hold_bars"] in (2, 3)
-        assert fold.test_metrics["n_bars"] > 0
-    assert result.oos["n_trades"] == sum(f.test_metrics["n_trades"] for f in result.folds)
+        assert (fold.test_metrics["n_bars"] or 0) > 0
+    assert result.oos["n_trades"] == sum(
+        (f.test_metrics["n_trades"] or 0) for f in result.folds
+    )
     assert 0.0 <= result.pct_positive_folds <= 1.0
 
 

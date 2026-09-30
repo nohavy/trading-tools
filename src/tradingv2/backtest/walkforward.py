@@ -20,7 +20,7 @@ class Fold:
     test_start_ns: int
     test_end_ns: int
     best_params: dict[str, float | int]
-    test_metrics: dict[str, object]
+    test_metrics: dict[str, float | int | None]
 
 
 @dataclass
@@ -128,21 +128,29 @@ def _config_with_params(config_path: Path, params: dict[str, float | int]) -> Pa
     return out
 
 
-def _read_metrics(run_dir: Path) -> dict[str, object]:
+def _read_metrics(run_dir: Path) -> dict[str, float | int | None]:
     import json
 
-    return json.loads((run_dir / "metrics.json").read_text(encoding="utf-8"))
+    raw: dict[str, float | int | None] = json.loads(
+        (run_dir / "metrics.json").read_text(encoding="utf-8")
+    )
+    return raw
+
+
+def _metric(metrics: dict[str, float | int | None], key: str) -> float:
+    value = metrics.get(key)
+    return float(value) if value is not None else 0.0
 
 
 def _aggregate(folds: list[Fold]) -> WalkForwardResult:
-    n_trades = sum(int(f.test_metrics["n_trades"]) for f in folds)
-    net_total = sum(float(f.test_metrics["net_total"] or 0.0) for f in folds)
-    gross_total = sum(float(f.test_metrics["gross_total"] or 0.0) for f in folds)
-    fees_total = sum(float(f.test_metrics["fees_total"] or 0.0) for f in folds)
-    slippage_total = sum(float(f.test_metrics["slippage_total"] or 0.0) for f in folds)
-    funding_total = sum(float(f.test_metrics["funding_total"] or 0.0) for f in folds)
+    n_trades = sum(int(_metric(f.test_metrics, "n_trades")) for f in folds)
+    net_total = sum(_metric(f.test_metrics, "net_total") for f in folds)
+    gross_total = sum(_metric(f.test_metrics, "gross_total") for f in folds)
+    fees_total = sum(_metric(f.test_metrics, "fees_total") for f in folds)
+    slippage_total = sum(_metric(f.test_metrics, "slippage_total") for f in folds)
+    funding_total = sum(_metric(f.test_metrics, "funding_total") for f in folds)
     expectancy_quote = net_total / n_trades if n_trades else 0.0
-    positive = sum(1 for f in folds if float(f.test_metrics["net_total"] or 0.0) > 0)
+    positive = sum(1 for f in folds if _metric(f.test_metrics, "net_total") > 0)
     pct_positive = positive / len(folds) if folds else 0.0
     oos: dict[str, float | int] = {
         "n_trades": n_trades,
