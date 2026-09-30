@@ -83,6 +83,9 @@ class Strategy(ABC):
     def on_fill(self, ctx: Context, event: FillEvent) -> None:  # noqa: B027
         """Called after each fill has been applied to the account."""
 
+    def on_funding(self, ctx: Context, rate: float) -> None:  # noqa: B027
+        """Called at each funding settlement, after the accounting is applied."""
+
     def on_timer(self, ctx: Context) -> None:  # noqa: B027
         """Called when a timer set via set_timer fires."""
 

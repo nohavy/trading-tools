@@ -188,13 +188,17 @@ class Engine:
                 self._account_fill(ctx, fill_event)
 
             # 2) then the event itself
-            if event.priority == 1:  # bar close or funding
-                rate = funding_by_ts.get(event.ts)
+            if event.priority == 1:  # bar close and/or funding settlement at this ts
+                # pop both mappings: a funding ts may coincide with a bar close;
+                # each must be consumed exactly once
+                rate = funding_by_ts.pop(event.ts, None)
+                bar = self._bar_by_close.pop(event.ts, None)
                 if rate is not None:
                     self._apply_funding(event.ts, rate)
-                    if event.ts not in self._bar_by_close:
-                        continue
-                bar = self._bar_by_close[event.ts]
+                    # the strategy sees the funding AFTER the accounting
+                    self.strategy.on_funding(ctx, rate)
+                if bar is None:
+                    continue
                 self._closed_bars.append(bar)
                 # bars-only mode: stops fire first, then limits, then market
                 # orders — each phase delivers fills so the strategy's bracket

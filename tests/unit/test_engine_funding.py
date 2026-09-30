@@ -114,7 +114,7 @@ def test_funding_applied_and_tracked_during_position() -> None:
             self._count += 1
             if self._count == 1:
                 ctx.submit_market(Side.BUY, qty=0.002)
-            elif self._count == self._n_bars:
+            elif self._count == self._n_bars - 1:  # exit submitted one bar before the end
                 ctx.submit_market(Side.SELL, qty=0.002)
 
     strategy = HoldStrategy(n_bars=6)
@@ -148,7 +148,7 @@ def test_funding_receiving_for_short() -> None:
             self._count += 1
             if self._count == 1:
                 ctx.submit_market(Side.SELL, qty=0.002)
-            elif self._count == self._n_bars:
+            elif self._count == self._n_bars - 1:
                 ctx.submit_market(Side.BUY, qty=0.002)
 
     engine, _ = make_engine(ShortStrategy(n_bars=6), n_bars=6)
