@@ -33,7 +33,24 @@ Le breakout a un **vrai edge brut, robuste** : stable sur toutes les grilles (lo
 - Un biais de signe dans l'analyse TP/SL (SL compté comme gain) a été attrapé avant d'induire en erreur — le recalcul confirme le verdict.
 - Le test de nullité + l'edge négatif cohérent avec la théorie des coûts = confiance dans la chaîne de mesure.
 
-## 5. Voies restantes (documentées, non closes)
+## 5. Pivot horizons longs (feature 005) : le funding-momentum, testé et tué OOS
+
+Le pivot vers des horizons 24-72 h a identifié un candidat : après un funding extrême (p95 roulant), le prix BTC/ETH CONTINUE (momentum du crowding) — brut +14 à +70 bps sur 8-72 h, net des frais maker×maker positif in-sample (BTC p90 : +24 à +58 bps ; ETH p95 : +55 à +66 bps). Le mécanisme est plausible (longs payants, liquidations en chaîne).
+
+**Le test final honnête** : backtest moteur sur 7 ans de données 1m UM (2020-2026, 3,5 M barres, frais taker réels, une position, funding compté), puis walk-forward chronologique (54 folds de 30 j train / 15 j test) :
+
+| Métrique OOS | Valeur |
+|---|---|
+| Folds positifs | **39 %** (requis 70 %) |
+| OOS net agrégé | **-47,4 USDT** sur 190 trades |
+| OOS brut | -33,6 USDT (même le prix ne suit pas OOS) |
+| Espérance/trade | -0,25 USDT (~-26 bps) |
+
+Le meilleur combo in-sample (+1,84 bps net, 282 trades, th=95 hold=48 h) **ne survit pas out-of-sample**. Le carry short funding est un edge connu et arbitré : visible in-sample, épuisé net de frais sur un actif liquide.
+
+Notons aussi le coût caché découvert : la version LONG (buy funding élevé, première hypothèse) perdait -8,6 % sur 7 ans car la détention PAIT le funding pendant les pics (~50 bps/trade) — le momentum prix (+28 bps) ne le couvre pas. Les deux côtés sont morts par le mécanisme même qui crée le signal.
+
+## 6. Voies restantes (documentées, non closes)
 
 1. **Microstructure du tape** : séquences d'agresseurs (aggTrades disponibles localement), autocorrélation des ticks — l'ordre de grandeur attendu reste 1-3 bps bruts au mieux.
 2. **Frais** : BNB/VIP réduit le maker×maker de 4 à ~3 bps — insuffisant seul (+0,8 brut).
