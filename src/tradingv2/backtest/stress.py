@@ -1,5 +1,7 @@
 """Cost stress scenarios: replay the same run with degraded costs only."""
 
+import json
+
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -51,8 +53,6 @@ def stress_test(
         scenario_cfg.write_text(yaml.safe_dump(variant), encoding="utf-8")
         run_dir = run_backtest(scenario_cfg, data_root=data_root, runs_root=runs_root)
         scenario_cfg.unlink()
-        import json
-
         metrics = json.loads((run_dir / "metrics.json").read_text(encoding="utf-8"))
         expectancy = metrics["expectancy_bps"]
         results.append(
