@@ -53,6 +53,7 @@ class FundingProbe(Strategy):
         self.order.append(f"funding@{ctx.now_ns // S}s")
 
     def on_bar(self, ctx: Context, bar: PriceBar) -> None:  # noqa: B027
+        del ctx
         if bar.ts_close_ns == 3 * S:
             self.order.append(f"bar@{bar.ts_close_ns // S}s")
 
@@ -84,14 +85,14 @@ def test_funding_hook_fires_before_bar_at_same_ts() -> None:
 
 def test_funding_accounting_applied_on_open_position() -> None:
     class HoldLong(FundingProbe):
-        def on_bar(self, ctx: Context, bar: PriceBar) -> None:  # noqa: B027
-            if bar.ts_close_ns == 1 * S and self.position_taken is False:
-                ctx.submit_market(Side.BUY, qty=0.002)
-                self.position_taken = True
-
         def __init__(self) -> None:
             super().__init__()
-            self.position_taken = False
+            self.position_taken: bool = False
+
+        def on_bar(self, ctx: Context, bar: PriceBar) -> None:  # noqa: B027
+            if bar.ts_close_ns == 1 * S and not self.position_taken:
+                ctx.submit_market(Side.BUY, qty=0.002)
+                self.position_taken = True
 
     probe = HoldLong()
     account = MarginAccount(balance=10_000.0, leverage=5)

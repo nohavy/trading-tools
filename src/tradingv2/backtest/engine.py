@@ -192,7 +192,7 @@ class Engine:
                 # pop both mappings: a funding ts may coincide with a bar close;
                 # each must be consumed exactly once
                 rate = funding_by_ts.pop(event.ts, None)
-                bar = self._bar_by_close.pop(event.ts, None)
+                bar = self._bar_by_close.pop(event.ts, None)  # type: ignore[arg-type]
                 if rate is not None:
                     self._apply_funding(event.ts, rate)
                     # the strategy sees the funding AFTER the accounting
