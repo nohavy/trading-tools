@@ -26,7 +26,7 @@ Validé les 29-30/09/2026. Microtrading crypto sur Binance : analyser les march�
 ## 3. Données disponibles (vérifiées sur data.binance.vision)
 
 - **Spot** : klines (tous intervalles, dont 1s), aggTrades, trades. Timestamps en microsecondes depuis le 2025-01-01, millisecondes avant.
-- **Futures UM** : klines, aggTrades, trades, prix mark/index, fundingRate (mensuel).
+- **Futures UM** : klines **à partir de 1m seulement** (pas de 1s), aggTrades, trades, prix mark/index, fundingRate (mensuel) → le sub-minute UM se construit depuis les aggTrades (`bars_from_trades`, validé : 2,5M barres 1s depuis 35,7M trades en ~1s).
 - **Pas de carnet L1/L2 gratuit récent** : bookTicker futures publié seulement de mai 2023 à mars 2024 → spread et file d'attente estimés avec bornes ; enregistrement en direct optionnel (`tv2 record`).
 - **Déséquilibre acheteurs/vendeurs** calculable dès les klines (volume taker buy inclus).
 - **Volumes BTCUSDT** : ~75 Mo/mois en klines 1s, 300-550 Mo/mois en aggTrades (zippés).

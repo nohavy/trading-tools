@@ -83,8 +83,8 @@
 ## Phase 7: Intégration réseau + polish
 
 - [x] T023 [P] `tests/integration/test_net_download.py` (@net) : 1 jour réel spot 1s BTCUSDT ≈ 86 400 lignes, checksum OK → commit `test: net telechargement`
-- [ ] T024 Validation SC (temps download, temps check, idempotence) sur le jeu réel d'août 2026 → commit `chore: validation sc`
-- [ ] T025 Docs : quickstart dans `docs/plan.md` ou README + mise à jour AGENTS.md si besoin → commit `docs: quickstart`
+- [x] T024 Validation SC (temps download, temps check, idempotence) sur le jeu réel d'août 2026 → commit `chore: validation sc`
+- [x] T025 Docs : quickstart dans `docs/plan.md` ou README + mise à jour AGENTS.md si besoin → commit `docs: quickstart`
 
 ## Dependencies & Execution Order
 

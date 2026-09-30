@@ -13,6 +13,13 @@ Références : `.specify/memory/constitution.md` (principes — prime sur tout) 
 - `uv run mypy` — vérification des types
 - `uv run tv2 --help` — CLI du projet
 
+## Usage données (feature 001)
+
+- `uv run tv2 data download --config configs/reference.yaml` — télécharge + convertit (Parquet ns) + catalogue (`data/catalog.json`) ; idempotent.
+- `uv run tv2 data check --config configs/reference.yaml` — contrôle qualité (trous, doublons, OHLC, outliers) ; exit 1 si anomalies.
+- `uv run tv2 data instruments --market spot --symbol BTCUSDT` — règles de trading (tick, step, minNotional) persistées dans `data/instruments/`.
+- Configs de référence dans `configs/` : `reference.yaml` (spot 1s), `download-um-1m.yaml` (futures : 1m minimum, pas de klines 1s), `download-*-aggtrades.yaml`, `funding-um-btc.yaml`.
+
 ## Workflow
 
 - Spec Kit : une feature = `specs/NNN-nom/` avec `spec.md` (QUOI) → `plan.md` (COMMENT) → `tasks.md` (checklist) → implémentation TDD.
