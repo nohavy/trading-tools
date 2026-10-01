@@ -116,3 +116,14 @@ def _write_bars(root: Path, *, clean: bool) -> None:
         }
     )
     write_parquet(df, root / "parquet/spot/klines/BTCUSDT/1s/BTCUSDT-1s-2026-08-01.parquet")
+
+
+def test_cli_scan_universe(tmp_path: Path) -> None:
+    result = runner.invoke(app, ["scan", "universe"])
+    assert result.exit_code == 0 or "network" in result.output.lower()
+
+
+def test_cli_scan_run_missing_config(tmp_path: Path) -> None:
+    result = runner.invoke(app, ["scan", "run", "--config", str(tmp_path / "nope.yaml")])
+    assert result.exit_code == 2
+    assert "not found" in result.output

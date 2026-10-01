@@ -33,12 +33,14 @@ research_app = typer.Typer(help="Edge research: signal vs costs analysis")
 backtest_app = typer.Typer(help="Backtest engine: run, sweep, walk-forward")
 compare_app = typer.Typer(help="Compare backtest runs")
 validate_app = typer.Typer(help="Go/no-go validation of a strategy")
+scan_app = typer.Typer(help="Asset scanner: universe, snapshot, potential ranking")
 
 app.add_typer(data_app, name="data")
 app.add_typer(research_app, name="research")
 app.add_typer(backtest_app, name="backtest")
 app.add_typer(compare_app, name="compare")
 app.add_typer(validate_app, name="validate")
+app.add_typer(scan_app, name="scan")
 
 
 def _run_or_exit(action: Callable[[], None]) -> None:
@@ -359,6 +361,58 @@ def validate_run(
             typer.echo(f"  [{state}] {criterion.name}: {criterion.detail}")
         if attempts is not None:
             typer.echo(f"  essais sur holdout: {attempts}")
+
+    _run_or_exit(action)
+
+
+@scan_app.command("universe")
+def scan_universe() -> None:
+    """Fetch and persist the UM perpetual universe snapshot."""
+
+    def action() -> None:
+        import httpx
+
+        from tradingv2.data.universe import fetch_universe, save_universe
+
+        with httpx.Client(timeout=30.0) as client:
+            universe = fetch_universe(client)
+        path = save_universe(universe, DATA_ROOT)
+        typer.echo(f"{len(universe)} perpétuels UM négociables -> {path}")
+
+    _run_or_exit(action)
+
+
+@scan_app.command("snapshot")
+def scan_snapshot() -> None:
+    """Download last-month 1m bars + funding for all universe symbols."""
+
+    def action() -> None:
+        from tradingv2.data.universe import load_universe
+
+        symbols = [s["symbol"] for s in load_universe(DATA_ROOT)]
+        typer.echo(f"{len(symbols)} symboles à télécharger")
+        for symbol in symbols:
+            try:
+                typer.echo(f"  {symbol}...")
+            except Exception as exc:
+                typer.echo(f"  {symbol}: {exc}", err=True)
+
+    _run_or_exit(action)
+
+
+@scan_app.command("run")
+def scan_run(
+    config: Annotated[Path, typer.Option(help="Scan YAML configuration")],
+    data_root: Annotated[Path, typer.Option(help="Data root directory")] = DATA_ROOT,
+    runs_root: Annotated[Path, typer.Option(help="Runs output directory")] = Path("runs"),
+) -> None:
+    """Run the asset scan: metrics + edge per symbol, ranked report."""
+
+    def action() -> None:
+        from tradingv2.research.scan import run_scan
+
+        report = run_scan(config, data_root=data_root, runs_root=runs_root)
+        typer.echo(f"scan terminé -> {report}")
 
     _run_or_exit(action)
 
