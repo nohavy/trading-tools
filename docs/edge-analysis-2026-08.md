@@ -102,6 +102,30 @@ Le scan montrait +95 à +192 bps net pour ces actifs. Le moteur montre -18 à +1
 
 **Leçon** : le scan d'edge est un filtre NÉCESSAIRE (il tue les idées clairement non viables) mais PAS SUFFISANT. Le backtest moteur reste le ground truth. Un edge brut au scan ne devient rentable que si une stratégie réaliste le capture — et la sortie (range re-entry vs horizon fixe) est aussi importante que l'entrée.
 
+## 5quater. Reproduction fidèle (breakout_hold) : verdict final par actif
+
+Stratégie `breakout_hold` (TDD) reproduisant exactement la mesure du scan — entrée à la cassure confirmée, **sortie exactement N barres plus tard**, une position à la fois, coûts réels taker×taker + slippage + latence. Bug majeur corrigé en route : **deadlock sur rejet de sortie** (notional < min après crash → re-soumission, verrouillé par test).
+
+Résultats (6 mois, 1m, lb30 vf2, buy-only = la mesure du scan) :
+
+| Actif | hold 5 | hold 15 | hold 60 | Verdict |
+|---|---|---|---|---|
+| TRUMP | -11,4 bps (t=-6,9) | -13,0 (t=-5,2) | -14,8 (t=-4,1) | **négatif significatif, les 2 côtés** |
+| ACE | +25,5 (8 trades) | -166,7 (7) | -352,1 (6) | pas de stats |
+| TUT | -160,8 (t=-0,8) | -76,0 (t=-0,2) | **+250,1 (t=1,4)** | incohérent entre holds |
+| ONG | **+31,8 (t=1,3, n=111)** | **+64,6 (t=1,6, n=91)** | **+59,5 (t=0,8, n=64)** | **positif partout, pas significatif** |
+
+Walk-forward ONG (folds 30j train / 15j test, hold optimisé par train) : **OOS +2,54 USDT sur 64 trades (+7,9 bps/trade net), 50 % de folds positifs, 2 folds vides** — direction correcte mais en dessous de tous les critères du verdict (≥300 trades OOS, ≥70 % folds, t ≥ 2).
+
+## 5quinquies. Conclusions définitives de l'investigation
+
+1. **L'écart scan↔moteur est maintenant expliqué et fermé** : le fixed-hold reproduit la mesure du scan ; l'écart restant venait du côté (le scan mesurait l'achat seul), du chevauchement des événements et des coûts taker vs maker.
+2. **Le breakout est un edge brut réel sur les alts volatils, mais sa capture réaliste est presque toujours cost-dominated** : TRUMP (les 2 côtés, significativement négatif net), ACE/TUT (bruit).
+3. **ONG est le seul survivant directionnel** (+8 bps/trade OOS net) : trop peu de données (6 mois) et pas significatif — mais c'est la première piste OOS positive du projet.
+4. **Verdict global : NO-GO** pour le passage au paper/live. La chaîne complète (scan → edge → backtest → walk-forward) a produit une réponse argumentée et documentée à chaque étape.
+
+Pistes restantes (à jour) : (a) accumuler des données ONG / familles corrélées et re-juger ; (b) signaux d'une autre nature (microstructure tape locale) ; (c) accepter la mesure — l'infrastructure est l'actif durable.
+
 ## 6. Impact sur la suite du projet
 
 La constitution exige un verdict go/no-go avant le réel : le verdict est **NO-GO** sur les données d'août pour les signaux testés. Le pipeline (temps réel → paper → live) reste construit pour en valider d'autres — mais passer au paper sans signal à edge positif n'a pas de sens : la prochaine étape utile est la recherche de signaux d'une autre nature, ou l'acceptation du résultat.
