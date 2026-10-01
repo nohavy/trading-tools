@@ -149,3 +149,28 @@ def test_sell_only_direction_skips_buy_breaks() -> None:
 def test_invalid_direction_rejected() -> None:
     with pytest.raises(ValueError, match="direction"):
         BreakoutFixedHold(lookback=3, volume_factor=2.0, hold_bars=2, direction="both_ways")
+
+
+def test_exit_rejection_on_price_crash_recovers() -> None:
+    """Exit notional < min after a crash: rejected → the strategy must resubmit.
+
+    Deadlock check: entry passes (notional 10 >= 5), price crashes so the exit
+    (2 < 5) is rejected; on recovery the exit is resubmitted and fills.
+    """
+    closes = [
+        5000.0, 5000.0, 5000.0,  # warmup
+        5005.0,  # breakout (entry fills at bar4 open = 5005)
+        5006.0,  # holding (bars_held=1)
+        1000.0,  # crash: exit submitted at bar5 close fills at bar6 open (1000) → rejected
+        5005.0,  # recovery: resubmitted exit fills at bar7 open
+        5005.0,
+    ]
+    volumes = [10.0] * 8
+    volumes[3] = 200.0
+    strategy = BreakoutFixedHold(lookback=3, volume_factor=2.0, hold_bars=2, qty=0.002)
+    result = run(closes, volumes, strategy)
+    trips = result.round_trips
+    assert len(trips) == 1, "the exit must eventually fill: no deadlock"
+    assert result.final_equity is not None
+    rejections = [o for o in result.orders if o.reject_reason is not None]
+    assert rejections, "the crashed-price exit must have been rejected once"

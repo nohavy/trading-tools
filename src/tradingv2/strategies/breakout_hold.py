@@ -5,7 +5,7 @@ exit exactly `hold_bars` bars later at market) so the engine measures what
 the scan promised — with realistic fills, costs and one position at a time.
 """
 
-from tradingv2.core.types import PriceBar, Side
+from tradingv2.core.types import OrderStatus, PriceBar, Side
 from tradingv2.strategy.base import Context, Strategy
 
 
@@ -66,6 +66,12 @@ class BreakoutFixedHold(Strategy):
             return
         # holding: fixed-duration exit
         self._bars_held += 1
+        if self._exit_pending_id is not None:
+            status = ctx.order_status(self._exit_pending_id)
+            if status == OrderStatus.REJECTED:
+                # exit rejected (e.g. notional below minimum after a crash):
+                # clear and resubmit on a later bar — never deadlock
+                self._exit_pending_id = None
         if self._bars_held >= self._hold_bars and self._exit_pending_id is None:
             self._exit_pending_id = ctx.submit_market(
                 Side.SELL if position > 0 else Side.BUY, qty=abs(position)

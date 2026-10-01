@@ -70,12 +70,17 @@ class FundingMomentum(Strategy):
             elif status in (OrderStatus.REJECTED, OrderStatus.CANCELED):
                 self._state = _FLAT
                 self._entry_order_id = None
-        elif self._state == HOLDING:
+        elif self._state in (HOLDING, EXITING):
             position = ctx.exchange.position_qty
             if position == 0.0:
                 self._state = _FLAT
                 return
             self._bars_held += 1
+            if self._exit_pending_id is not None:
+                status = ctx.order_status(self._exit_pending_id)
+                if status == OrderStatus.REJECTED:
+                    self._exit_pending_id = None
+                    self._state = HOLDING
             if self._bars_held >= self._hold_bars and self._exit_pending_id is None:
                 self._exit_pending_id = ctx.submit_market(self._exit_side, qty=abs(position))
                 self._state = EXITING
