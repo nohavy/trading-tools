@@ -14,7 +14,6 @@ import datetime as dt
 import json
 from pathlib import Path
 
-import numpy as np
 import polars as pl
 
 from tradingv2.research.cross_section import (
@@ -25,8 +24,6 @@ from tradingv2.research.cross_section import (
 )
 
 DAILY = Path("data/daily/um")
-MATRIX = Path("data/daily_close_matrix.parquet")
-DAILY_NS = 86_400_000_000_000
 
 
 def date_ns(text: str) -> int:
@@ -40,24 +37,23 @@ def load_long() -> pl.DataFrame:
     files = sorted(str(p) for p in DAILY.rglob("*.parquet"))
     if not files:
         raise SystemExit(f"no parquet under {DAILY}; run scripts/fetch_daily.py first")
-    frame = pl.read_parquet(files, columns=["ts_open_ns", "close", "quote_volume"])
-    symbol = np.array([Path(f).parent.name for f in files], dtype=object)
-    return (
-        frame.with_columns(
-            pl.Series("symbol", np.repeat(symbol, frame.height)),
+    frame = (
+        pl.scan_parquet(files, include_file_paths="path")
+        .select("ts_open_ns", "close", "quote_volume", "path")
+        .collect()
+        .with_columns(
+            pl.col("path")
+            .str.split("/")
+            .list.get(-2)
+            .alias("symbol")
         )
-        .select("ts_open_ns", "symbol", "close", "quote_volume")
-        .unique(subset=["ts_open_ns", "symbol"], keep="first")
-        .sort(["ts_open_ns", "symbol"])
+        .drop("path")
     )
-
-
-def build_matrix(long: pl.DataFrame) -> pl.DataFrame:
-    """Wide close matrix (one row per day, one column per symbol)."""
-    matrix = long.pivot(on="symbol", index="ts_open_ns", values="close").sort("ts_open_ns")
-    matrix.write_parquet(MATRIX)
-    return matrix
-
+    return (
+        frame.unique(subset=["ts_open_ns", "symbol"], keep="first")
+        .sort(["ts_open_ns", "symbol"])
+        .select("ts_open_ns", "symbol", "close", "quote_volume")
+    )
 
 
 

@@ -27,11 +27,11 @@ class QuintileResult:
 
 
 def _pivot_close(frame: pl.DataFrame) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """Wide close matrix (dates × assets) from long (ts, symbol, close)."""
-    wide = frame.pivot(on="symbol", index="ts_ns", values="close").sort("ts_ns")
-    symbols = [c for c in wide.columns if c != "ts_ns"]
+    """Wide close matrix (dates × assets) from long (ts_open_ns, symbol, close)."""
+    wide = frame.pivot(on="symbol", index="ts_open_ns", values="close").sort("ts_open_ns")
+    symbols = [c for c in wide.columns if c != "ts_open_ns"]
     close = wide.select(symbols).to_numpy()
-    ts = wide["ts_ns"].to_numpy()
+    ts = wide["ts_open_ns"].to_numpy()
     return ts, close, np.array(symbols)
 
 
@@ -45,6 +45,8 @@ def quintile_spreads(
     min_assets: int = 2,
 ) -> QuintileResult:
     """Study top-vs-bottom cross-sectional momentum over the frame.
+
+    `frame` is long (ts_open_ns, symbol, close) — the canonical bar schema.
 
     At each date t (with lookback history and forward data available):
     - past return_i = close[t]/close[t-lookback] - 1

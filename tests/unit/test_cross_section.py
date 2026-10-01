@@ -14,10 +14,10 @@ DAY = 86_400_000_000_000
 
 
 def daily_frame(growth: dict[str, float], n_days: int) -> pl.DataFrame:
-    """Long (ts_ns, symbol, close) frame: symbol s starts at 100, grows `growth[s]`/day."""
+    """Long (ts_open_ns, symbol, close) frame: symbol s starts at 100, grows `growth[s]`/day."""
     return pl.DataFrame(
         {
-            "ts_ns": [i * DAY for i in range(n_days) for _ in growth],
+            "ts_open_ns": [i * DAY for i in range(n_days) for _ in growth],
             "symbol": [s for _ in range(n_days) for s in growth],
             "close": [
                 100.0 * growth[s] ** i for i in range(n_days) for s in growth
@@ -82,7 +82,7 @@ def test_gap_in_one_asset_is_tolerated() -> None:
     ts = [i * DAY for i in range(n_days)]
     frame = pl.DataFrame(
         {
-            "ts_ns": ts + ts + ts[3:],
+            "ts_open_ns": ts + ts + ts[3:],
             "symbol": ["A"] * n_days + ["B"] * n_days + ["C"] * (n_days - 3),
             "close": (
                 [100.0 * 1.004 ** i for i in range(n_days)]
