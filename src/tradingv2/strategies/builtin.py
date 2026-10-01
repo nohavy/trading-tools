@@ -36,11 +36,13 @@ def register_strategy(name: str, cls: type[Strategy]) -> None:
 
 def _register_builtins() -> None:
     from tradingv2.strategies.breakout import BreakoutVolume
+    from tradingv2.strategies.breakout_hold import BreakoutFixedHold
     from tradingv2.strategies.buyhold import BuyHold
     from tradingv2.strategies.flow import OrderFlowImbalance
     from tradingv2.strategies.funding import FundingMomentum
     from tradingv2.strategies.meanrev import MeanRevZScore
 
+    register_strategy("breakout_hold", BreakoutFixedHold)
     register_strategy("funding_momentum", FundingMomentum)
     register_strategy("meanrev_zscore", MeanRevZScore)
     register_strategy("breakout_volume", BreakoutVolume)

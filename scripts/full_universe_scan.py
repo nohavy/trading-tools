@@ -1,9 +1,7 @@
 """Full universe scan: download + metrics + edge for all UM perpetuals (2026-08)."""
 import json
-import sys
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from datetime import date, timedelta
 from pathlib import Path
 
 import httpx
@@ -110,7 +108,11 @@ def asset_metrics(bars: pl.DataFrame, min_quote_volume_daily: float = 0.0) -> di
     # 1h aggregation
     hour_ns = 3600 * S
     hour_bucket = bars["ts_open_ns"] // hour_ns
-    hourly = bars.with_columns(hour_bucket.alias("_b")).group_by("_b", maintain_order=True).agg(pl.col("close").last())
+    hourly = (
+        bars.with_columns(hour_bucket.alias("_b"))
+        .group_by("_b", maintain_order=True)
+        .agg(pl.col("close").last())
+    )
     hourly_close = hourly["close"].to_numpy()
     if len(hourly_close) >= 2:
         hrets = np.diff(hourly_close) / hourly_close[:-1]
@@ -119,9 +121,13 @@ def asset_metrics(bars: pl.DataFrame, min_quote_volume_daily: float = 0.0) -> di
         vol_1h = None
     day_ns = 86_400 * S
     day_bucket = bars["ts_open_ns"] // day_ns
-    daily_qv = bars.with_columns(day_bucket.alias("_d")).group_by("_d").agg(pl.col("quote_volume").sum())
+    daily_qv = (
+        bars.with_columns(day_bucket.alias("_d")).group_by("_d").agg(pl.col("quote_volume").sum())
+    )
     qv_daily = float(daily_qv["quote_volume"].mean())
-    daily_nt = bars.with_columns(day_bucket.alias("_d")).group_by("_d").agg(pl.col("n_trades").sum())
+    daily_nt = (
+        bars.with_columns(day_bucket.alias("_d")).group_by("_d").agg(pl.col("n_trades").sum())
+    )
     nt_daily = float(daily_nt["n_trades"].mean())
     span_days = (float(bars["ts_open_ns"][-1] - bars["ts_open_ns"][0])) / (86_400.0 * S)
     dead = qv_daily < min_quote_volume_daily or span_days < 20.0
@@ -151,7 +157,6 @@ def forward_edge(bars: pl.DataFrame, direction: str, horizon_s: int) -> float | 
 def breakout_forward_edge(bars: pl.DataFrame, horizon_s: int = 300) -> float | None:
     """Forward return after breakout signals (the best-performing signal)."""
     close = bars["close"].to_numpy()
-    ts = bars["ts_open_ns"].to_numpy()
     high = bars["high"].to_numpy()
     vol = bars["volume"].to_numpy()
     lookback = 30
@@ -224,7 +229,11 @@ def main() -> None:
         [a for a in assets if a["edge_net"] is not None],
         key=lambda a: -a["edge_net"],
     )
-    print(f"{'Symbole':>14} {'Vol1m':>7} {'Vol/j(M)':>8} {'BO/j':>6} {'Brut60':>8} {'Brut300':>8} {'BrutBO':>8} {'EdgeNet':>8}")
+    header = (
+        f"{'Symbole':>14} {'Vol1m':>7} {'Vol/j(M)':>8} {'BO/j':>6}"
+        f" {'Brut60':>8} {'Brut300':>8} {'BrutBO':>8} {'EdgeNet':>8}"
+    )
+    print(header)
     for a in ranked[:20]:
         bo = a.get("breakout_freq", 0) or 0
         b60 = a.get("brut_60s", 0) or 0
