@@ -8,21 +8,21 @@
 
 ## Phase 1: Univers (US1, P1)
 
-- [ ] T001 [US1] RED `test_universe` (filtres exchangeInfo via MockTransport : PERPETUAL + TRADING + USDT uniquement ; persistence horodatée) → GREEN `data/universe.py` → commit `feat: univers perpétuels`
+- [x] T001 [US1] RED `test_universe` (filtres exchangeInfo via MockTransport : PERPETUAL + TRADING + USDT uniquement ; persistence horodatée) → GREEN `data/universe.py` → commit `feat: univers perpétuels`
 
 ## Phase 2: Métriques + edge par actif (US2/US3, P2/P3)
 
-- [ ] T002 [US2] RED `test_asset_metrics` (goldens synthétiques : vol 1m/1h, liquidité journalière, fréquence de cassures, funding None, marque dead) → GREEN `research/asset_metrics.py` → commit `feat: métriques d'actif`
-- [ ] T003 [US3] RED `test_asset_edge` (edge par actif : signaux existants, score max à l'horizon cible, edge net vs maker, marque peu de trades) → GREEN `research/scan.py::asset_edge` → commit `feat: edge par actif`
+- [x] T002 [US2] RED `test_asset_metrics` (goldens synthétiques : vol 1m/1h, liquidité journalière, fréquence de cassures, funding None, marque dead) → GREEN `research/asset_metrics.py` → commit `feat: métriques d'actif`
+- [x] T003 [US3] RED `test_asset_edge` (edge par actif : signaux existants, score max à l'horizon cible, edge net vs maker, marque peu de trades) → GREEN `research/scan.py::asset_edge` → commit `feat: edge par actif`
 
 ## Phase 3: Orchestration + rapport (US4, P4)
 
-- [ ] T004 [US4] RED `test_scan` (E2E synthétique : univers 4 actifs, 1 mort, 1 défaillant, 2 bons ; snapshot isolé par symbole ; classement déterministe ; rapport autonome ; candidats exportés) → GREEN `research/scan.py::run_scan` → commit `feat: orchestration scan`
-- [ ] T005 [US4] RED `test_cli_scan` (smoke `tv2 scan universe/snapshot/run`, erreurs propres) → GREEN cli → commit `feat: cli scan`
+- [x] T004 [US4] RED `test_scan` (E2E synthétique : univers 4 actifs, 1 mort, 1 défaillant, 2 bons ; snapshot isolé par symbole ; classement déterministe ; rapport autonome ; candidats exportés) → GREEN `research/scan.py::run_scan` → commit `feat: orchestration scan`
+- [x] T005 [US4] RED `test_cli_scan` (smoke `tv2 scan universe/snapshot/run`, erreurs propres) → GREEN cli → commit `feat: cli scan`
 
 ## Phase 4: Réel
 
-- [ ] T006 [US1] `slow` scan réel : univers réel, instantané ~100 actifs top volume, scan complet, candidats exportés → commit `test: scan réel`
+- [x] T006 [US1] `slow` scan réel : univers réel, instantané ~100 actifs top volume, scan complet, candidats exportés → commit `test: scan réel`
 - [ ] T007 [US3] Validation des 3-5 meilleurs candidats par la chaîne existante (backtest → WF → stress → verdict) + docs → commit `docs: candidats du scan`
 
 ## Dependencies & Execution Order
