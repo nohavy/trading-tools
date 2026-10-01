@@ -103,3 +103,54 @@ def quintile_spreads(
         spread_hit_rate=float((arr > 0).mean()),
         spread_series=spreads,
     )
+
+
+def liquidity_filter(
+    long: pl.DataFrame,
+    *,
+    lookback: int = 30,
+    quantile: float = 0.2,
+) -> pl.DataFrame:
+    """Drop assets that are not liquid enough to trade at the modelled costs.
+
+    An asset stays eligible on a date when its trailing median quote volume is
+    at or above the `quantile` of that date's cross-section. Returns only
+    (ts_open_ns, symbol, close), which quintile_spreads pivots into a matrix
+    where the removed assets simply become NaN.
+    """
+    ordered = long.sort(["symbol", "ts_open_ns"]).with_columns(
+        pl.col("quote_volume")
+        .rolling_median(window_size=lookback, min_samples=7)
+        .over("symbol")
+        .alias("med_vol")
+    )
+    thresholds = ordered.group_by("ts_open_ns").agg(
+        pl.col("med_vol")
+        .quantile(quantile, interpolation="higher")
+        .alias("cutoff")
+    )
+    return (
+        ordered.join(thresholds, on="ts_open_ns")
+        .filter(pl.col("med_vol") >= pl.col("cutoff"))
+        .select("ts_open_ns", "symbol", "close")
+    )
+
+
+def newey_west_tstat(spread: list[float], lag: int) -> float:
+    """t-statistic of the mean, corrected for autocorrelation up to `lag`.
+
+    Overlapping forward windows make neighbouring spreads correlated, so the
+    naive t-stat overstates significance; the Newey-West bandwidth shrinks it.
+    """
+    x = np.asarray(spread, dtype=float)
+    n = x.size
+    if n < lag + 2:
+        return float("nan")
+    dev = x - x.mean()
+    var = float(dev @ dev) / n
+    for k in range(1, lag + 1):
+        cov = float(dev[k:] @ dev[:-k]) / n
+        var += 2.0 * (1.0 - k / (lag + 1.0)) * cov
+    if var <= 0:
+        return float("nan")
+    return float(x.mean() / np.sqrt(var / n))

@@ -1,9 +1,14 @@
 """Tests for cross-sectional momentum quintile studies (Way A core)."""
 
+import numpy as np
 import polars as pl
 import pytest
 
-from tradingv2.research.cross_section import quintile_spreads
+from tradingv2.research.cross_section import (
+    liquidity_filter,
+    newey_west_tstat,
+    quintile_spreads,
+)
 
 DAY = 86_400_000_000_000
 
@@ -104,3 +109,73 @@ def test_empty_result_when_no_usable_date() -> None:
     assert result.n_dates == 0
     assert result.spread_mean_bps is None
     assert result.spread_series is None
+
+
+def _long_with_volumes(volumes: dict[str, float], n_days: int = 40) -> pl.DataFrame:
+    return pl.DataFrame(
+        {
+            "ts_open_ns": [i * DAY for i in range(n_days) for _ in volumes],
+            "symbol": [s for _ in range(n_days) for s in volumes],
+            "close": [
+                100.0 * 1.002**i for i in range(n_days) for _ in volumes
+            ],
+            "quote_volume": [volumes[s] for _ in range(n_days) for s in volumes],
+        }
+    )
+
+
+def test_liquidity_filter_drops_the_illiquid_tail() -> None:
+    volumes = {f"A{i}": 1_000_000.0 for i in range(8)}
+    volumes["A0"] = 1_000.0
+    volumes["A1"] = 2_000.0
+    filtered = liquidity_filter(_long_with_volumes(volumes), quantile=0.2)
+    survivors = set(filtered["symbol"].unique().to_list())
+    assert survivors == set(f"A{i}" for i in range(2, 8))
+
+
+def test_liquidity_filter_keeps_everything_when_uniform() -> None:
+    volumes = {f"A{i}": 5_000_000.0 for i in range(6)}
+    filtered = liquidity_filter(_long_with_volumes(volumes), quantile=0.2)
+    assert filtered["symbol"].n_unique() == 6
+
+
+def test_liquidity_filter_uses_trailing_median() -> None:
+    """The asset whose volume dies (HOT) is dropped once its trailing median sags."""
+    n_days = 60
+    ts = [i * DAY for i in range(n_days)]
+    frame = pl.DataFrame(
+        {
+            "ts_open_ns": ts * 2,
+            "symbol": ["HOT"] * n_days + ["COLD"] * n_days,
+            "close": [100.0] * (n_days * 2),
+            "quote_volume": [1_000_000.0] * 40 + [1.0] * 20 + [1_000_000.0] * n_days,
+        }
+    )
+    filtered = liquidity_filter(frame, quantile=0.5, lookback=30)
+    last_dates = filtered.filter(pl.col("ts_open_ns") == ts[-1])["symbol"].to_list()
+    assert last_dates == ["COLD"]
+    early_dates = set(filtered.filter(pl.col("ts_open_ns") == ts[35])["symbol"].to_list())
+    assert early_dates == {"HOT", "COLD"}
+
+
+def test_newey_west_tstat_matches_iid_expectation() -> None:
+    rng = np.random.default_rng(7)
+    x = rng.normal(0.5, 1.0, size=500).tolist()
+    t = newey_west_tstat(x, lag=1)
+    naive = np.mean(x) / (np.std(x, ddof=1) / np.sqrt(len(x)))
+    assert t == pytest.approx(naive, rel=0.15)
+    assert t > 2.0
+
+
+def test_newey_west_penalises_positive_autocorrelation() -> None:
+    """Overlapping forward windows inflate the naive t-stat; NW must shrink it."""
+    rng = np.random.default_rng(11)
+    shocks = rng.normal(0.0, 1.0, size=400)
+    x = np.cumsum(shocks) * 0.1 + 0.2  # strong positive autocorrelation
+    naive = float(np.mean(x) / (np.std(x, ddof=1) / np.sqrt(x.size)))
+    t = newey_west_tstat(x.tolist(), lag=5)
+    assert abs(t) < abs(naive)
+
+
+def test_newey_west_tstat_nan_when_series_too_short() -> None:
+    assert np.isnan(newey_west_tstat([0.1, 0.2], lag=5))
