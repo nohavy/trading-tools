@@ -10,6 +10,7 @@ exchangeInfo, so delisted perps stay in the cross-section.
 """
 
 import argparse
+import datetime as dt
 import json
 from pathlib import Path
 
@@ -30,9 +31,8 @@ DAILY_NS = 86_400_000_000_000
 
 def date_ns(text: str) -> int:
     """UTC midnight of a YYYY-MM-DD string, in nanoseconds."""
-    import datetime as dt
-
-    return int(dt.datetime.strptime(text, "%Y-%m-%d").replace(tzinfo=dt.UTC).timestamp()) * 1_000_000_000
+    day = dt.datetime.strptime(text, "%Y-%m-%d").replace(tzinfo=dt.UTC)
+    return int(day.timestamp()) * 1_000_000_000
 
 
 def load_long() -> pl.DataFrame:
