@@ -126,4 +126,4 @@ def test_cli_scan_universe(tmp_path: Path) -> None:
 def test_cli_scan_run_missing_config(tmp_path: Path) -> None:
     result = runner.invoke(app, ["scan", "run", "--config", str(tmp_path / "nope.yaml")])
     assert result.exit_code == 2
-    assert "not found" in result.output
+    assert "nope.yaml" in result.output
