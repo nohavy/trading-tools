@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>tradingv2 — scan ({{ n }} actifs)</title>
+<style>
+body { font-family: system-ui, sans-serif; margin: 24px; }
+table { border-collapse: collapse; }
+td, th { border: 1px solid #ddd; padding: 4px 12px; font-size: 14px; }
+th { background: #eee; }
+.dead { color: #999; font-style: italic; }
+.skip { color: #b45309; }
+h2 { font-size: 16px; margin-top: 24px; }
+</style>
+</head>
+<body>
+<h1>Scan — {{ n }} actifs classés</h1>
+<p>{{ n_candidates }} candidats (edge net > seuil), {{ skipped|length }} écartés</p>
+<h2>Classement par edge net estimé</h2>
+<table>
+<tr><th>Symbole</th><th>Vol 1m (bps)</th><th>Vol liq/j</th><th>Cassures/j</th><th>Edge net (bps)</th><th>Meilleur signal</th></tr>
+{% for row in rows %}
+<tr class="{{ 'dead' if row.dead else '' }}">
+  <td>{{ row.symbol }}</td>
+  <td>{{ row.vol }}</td>
+  <td>{{ row.liq }}</td>
+  <td>{{ row.breaks }}</td>
+  <td>{{ row.edge }}</td>
+  <td>{{ row.best }}</td>
+</tr>
+{% endfor %}
+</table>
+{% if skipped %}
+<h2>Écartés</h2>
+<p class="skip">{{ skipped | join(", ") }}</p>
+{% endif %}
+</body>
+</html>
