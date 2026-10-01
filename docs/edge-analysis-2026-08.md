@@ -82,6 +82,26 @@ L'analyse a été étendue à **tous les perpétuels USDⓈ-M négociables** (52
 
 **Réserves honnêtes** : in-sample (une seule période) ; les fills réels sur ces actifs sont à valider ; le breakout_freq est faible (<1/jour pour la plupart) → peu de trades indépendants. La validation par la chaîne complète (walk-forward, stress, verdict) reste indispensable.
 
+## 5ter. Validation moteur des top candidats : divergence scan↔moteur
+
+Les 4 top candidats du scan (ONGUSDT, ACEUSDT, TUTUSDT, TRUMPUSDT) ont été backtestés dans le moteur (6 mois, 1m, breakout_volume lb30 vf5, max_hold 5 barres = horizon du scan) :
+
+| Actif | Trades | Net (USDT) | Espérance (bps) | Win rate | PF | t-stat |
+|---|---|---|---|---|---|---|
+| ONGUSDT | 2542 | -371 | **-12.8** | 23.6% | 0.40 | -14.4 |
+| ACEUSDT | 1969 | -23 | **-17.9** | 25.2% | 0.35 | -9.7 |
+| TRUMPUSDT | 58 | +1 | **+18.3** | 32.8% | 1.41 | +0.7 |
+
+Le scan montrait +95 à +192 bps net pour ces actifs. Le moteur montre -18 à +18 bps.
+
+**Causes de la divergence** :
+1. **Événements chevauchants** : le scan compte chaque barre de cassure comme un événement indépendant (~2300/mois). Le moteur n'entre que si flat (une position) — ~212 trades/mois. Les événements non-first d'un cluster ont un edge différent du premier.
+2. **Sortie range-re-entry vs horizon fixe** : le scan mesure un hold fixe de 300 s. Le moteur sort quand le prix retourne dans la plage d'entrée — durée variable, parfois très courte (le prix ne revient jamais → max_hold).
+3. **Coûts** : le scan suppose maker×maker (4 bps). Le moteur entre au marché (taker×taker = 10 bps + slippage).
+4. **Timing d'entrée** : le scan mesure depuis le close de la barre de cassure. Le moteur entre au open de la barre suivante + latence + slippage.
+
+**Leçon** : le scan d'edge est un filtre NÉCESSAIRE (il tue les idées clairement non viables) mais PAS SUFFISANT. Le backtest moteur reste le ground truth. Un edge brut au scan ne devient rentable que si une stratégie réaliste le capture — et la sortie (range re-entry vs horizon fixe) est aussi importante que l'entrée.
+
 ## 6. Impact sur la suite du projet
 
 La constitution exige un verdict go/no-go avant le réel : le verdict est **NO-GO** sur les données d'août pour les signaux testés. Le pipeline (temps réel → paper → live) reste construit pour en valider d'autres — mais passer au paper sans signal à edge positif n'a pas de sens : la prochaine étape utile est la recherche de signaux d'une autre nature, ou l'acceptation du résultat.
