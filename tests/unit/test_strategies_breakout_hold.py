@@ -123,3 +123,29 @@ def test_registered_in_registry() -> None:
 
     strategy = build_strategy("breakout_hold", {"lookback": 10, "hold_bars": 3})
     assert isinstance(strategy, BreakoutFixedHold)
+
+
+def test_buy_only_direction_skips_sell_breaks() -> None:
+    # down-break with volume: no short when direction="buy"
+    closes = [5010.0, 5010.0, 5010.0, 5004.0, 5003.0, 5002.0, 5001.0, 5000.0]
+    volumes = [10.0, 10.0, 10.0, 200.0, 10.0, 10.0, 10.0, 10.0]
+    strategy = BreakoutFixedHold(
+        lookback=3, volume_factor=2.0, hold_bars=2, qty=0.002, direction="buy"
+    )
+    result = run(closes, volumes, strategy)
+    assert result.fill_events == []
+
+
+def test_sell_only_direction_skips_buy_breaks() -> None:
+    closes = [5000.0, 5000.0, 5000.0, 5005.0, 5006.0, 5007.0, 5008.0, 5009.0]
+    volumes = [10.0, 10.0, 10.0, 200.0, 10.0, 10.0, 10.0, 10.0]
+    strategy = BreakoutFixedHold(
+        lookback=3, volume_factor=2.0, hold_bars=2, qty=0.002, direction="sell"
+    )
+    result = run(closes, volumes, strategy)
+    assert result.fill_events == []
+
+
+def test_invalid_direction_rejected() -> None:
+    with pytest.raises(ValueError, match="direction"):
+        BreakoutFixedHold(lookback=3, volume_factor=2.0, hold_bars=2, direction="both_ways")

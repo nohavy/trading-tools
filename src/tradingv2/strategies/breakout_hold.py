@@ -23,7 +23,10 @@ class BreakoutFixedHold(Strategy):
         volume_factor: float = 2.0,
         hold_bars: int = 5,
         qty: float = 0.002,
+        direction: str = "both",
     ) -> None:
+        if direction not in ("both", "buy", "sell"):
+            raise ValueError(f"direction must be 'both', 'buy' or 'sell', got {direction!r}")
         if lookback <= 0:
             raise ValueError(f"lookback must be positive, got {lookback}")
         if volume_factor <= 0:
@@ -34,6 +37,7 @@ class BreakoutFixedHold(Strategy):
         self._volume_factor = volume_factor
         self._hold_bars = hold_bars
         self._qty = qty
+        self._direction = direction
         self._highs: list[float] = []
         self._lows: list[float] = []
         self._volumes: list[float] = []
@@ -52,9 +56,11 @@ class BreakoutFixedHold(Strategy):
             range_low = min(self._lows[-self._lookback :])
             avg_volume = sum(self._volumes[-self._lookback :]) / self._lookback
             if bar.volume > self._volume_factor * avg_volume:
-                if bar.close > range_high:
+                up_break = bar.close > range_high
+                down_break = bar.close < range_low
+                if up_break and self._direction in ("both", "buy"):
                     ctx.submit_market(Side.BUY, qty=self._qty)
-                elif bar.close < range_low:
+                elif down_break and self._direction in ("both", "sell"):
                     ctx.submit_market(Side.SELL, qty=self._qty)
             self._shift(bar)
             return
