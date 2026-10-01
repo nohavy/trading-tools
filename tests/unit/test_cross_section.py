@@ -8,6 +8,7 @@ from tradingv2.research.cross_section import (
     liquidity_filter,
     newey_west_tstat,
     quintile_spreads,
+    top_minus_universe,
 )
 
 DAY = 86_400_000_000_000
@@ -179,3 +180,38 @@ def test_newey_west_penalises_positive_autocorrelation() -> None:
 
 def test_newey_west_tstat_nan_when_series_too_short() -> None:
     assert np.isnan(newey_west_tstat([0.1, 0.2], lag=5))
+
+
+def test_top_minus_universe_isolates_selection_from_beta() -> None:
+    """The universe drifts up but the top bucket drifts up more: the difference
+    is the selection effect, independent of the market's own drift."""
+    frame = daily_frame({"A": 1.02, "B": 1.01, "C": 1.0, "D": 0.99, "E": 0.98}, n_days=40)
+    result = top_minus_universe(frame, lookback_days=7, horizon_days=1, top_fraction=0.2)
+    # top = A (+200 bps/day forward), universe mean = (200+100+0-100-200)/5 = 0
+    assert result.top_mean_bps == pytest.approx(200.0, abs=10.0)
+    assert result.benchmark_mean_bps == pytest.approx(0.0, abs=10.0)
+    assert result.difference_mean_bps == pytest.approx(200.0, abs=20.0)
+    assert result.n_dates == 40 - 7 - 1
+
+
+def test_top_minus_universe_zero_without_persistence() -> None:
+    frame = daily_frame({s: 1.005 for s in "ABCDE"}, n_days=30)
+    result = top_minus_universe(frame, lookback_days=5, horizon_days=1)
+    assert result.difference_mean_bps == pytest.approx(0.0, abs=1.0)
+
+
+def test_top_minus_universe_subtracts_one_leg_round_trip() -> None:
+    frame = daily_frame({"A": 1.02, "B": 1.01, "C": 1.0, "D": 0.99, "E": 0.98}, n_days=40)
+    gross = top_minus_universe(frame, lookback_days=7, horizon_days=1)
+    net = top_minus_universe(frame, lookback_days=7, horizon_days=1, round_trip_bps=4.0)
+    assert gross.difference_mean_bps is not None
+    assert net.difference_mean_bps == pytest.approx(gross.difference_mean_bps - 4.0)
+    # the cost hits the difference, not the raw top return
+    assert net.top_mean_bps == pytest.approx(gross.top_mean_bps)
+
+
+def test_top_minus_universe_returns_empty_when_no_usable_date() -> None:
+    frame = daily_frame({s: 1.01 for s in "ABC"}, n_days=4)
+    result = top_minus_universe(frame, lookback_days=5, horizon_days=1)
+    assert result.n_dates == 0
+    assert result.difference_mean_bps is None

@@ -26,6 +26,84 @@ class QuintileResult:
     spread_series: list[float] | None
 
 
+@dataclass(frozen=True)
+class TopVsUniverseResult:
+    """Long-only top bucket compared with the equal-weight universe."""
+
+    n_dates: int
+    n_assets: int
+    top_mean_bps: float | None
+    benchmark_mean_bps: float | None
+    difference_mean_bps: float | None
+    difference_median_bps: float | None
+    hit_rate: float | None
+    difference_series: list[float] | None
+
+
+def top_minus_universe(
+    frame: pl.DataFrame,
+    *,
+    lookback_days: int,
+    horizon_days: int,
+    top_fraction: float = 0.2,
+    round_trip_bps: float = 0.0,
+    min_assets: int = 2,
+) -> TopVsUniverseResult:
+    """Compare the long-only top bucket with holding the whole universe.
+
+    The universe's own drift cancels in the difference, so what is left is the
+    selection effect alone — the question a long-only trader actually asks:
+    does picking the winners beat just holding the cross-section? Costs are
+    charged once per rebalance on the traded leg.
+    """
+    ts, close, symbols = _pivot_close(frame)
+    n_assets = len(symbols)
+    if n_assets < min_assets:
+        raise ValueError(f"need at least {min_assets} assets, got {n_assets}")
+    n_days = len(ts)
+    bucket_size = max(1, int(n_assets * top_fraction))
+
+    top_means: list[float] = []
+    bench_means: list[float] = []
+    differences: list[float] = []
+    for t in range(lookback_days, n_days - horizon_days):
+        past = close[t] / close[t - lookback_days] - 1.0
+        forward = close[t + horizon_days] / close[t] - 1.0
+        defined = ~np.isnan(past) & ~np.isnan(forward)
+        if defined.sum() < 2:
+            continue
+        past_d, forward_d = past[defined], forward[defined]
+        order = np.argsort(past_d)
+        top_ret = float(np.mean(forward_d[order[-bucket_size:]])) * 1e4
+        bench_ret = float(np.mean(forward_d)) * 1e4
+        top_means.append(top_ret)
+        bench_means.append(bench_ret)
+        differences.append(top_ret - bench_ret - round_trip_bps)
+
+    if not differences:
+        return TopVsUniverseResult(
+            n_dates=0,
+            n_assets=n_assets,
+            top_mean_bps=None,
+            benchmark_mean_bps=None,
+            difference_mean_bps=None,
+            difference_median_bps=None,
+            hit_rate=None,
+            difference_series=None,
+        )
+    arr = np.array(differences)
+    return TopVsUniverseResult(
+        n_dates=len(differences),
+        n_assets=n_assets,
+        top_mean_bps=float(np.mean(top_means)),
+        benchmark_mean_bps=float(np.mean(bench_means)),
+        difference_mean_bps=float(arr.mean()),
+        difference_median_bps=float(np.median(arr)),
+        hit_rate=float((arr > 0).mean()),
+        difference_series=differences,
+    )
+
+
 def _pivot_close(frame: pl.DataFrame) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Wide close matrix (dates × assets) from long (ts_open_ns, symbol, close)."""
     wide = frame.pivot(on="symbol", index="ts_open_ns", values="close").sort("ts_open_ns")
