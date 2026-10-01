@@ -57,6 +57,31 @@ Notons aussi le coût caché découvert : la version LONG (buy funding élevé, 
 3. **Style différent** : horizons minutes→heures avec signaux plus riches (l'edge local ne persiste pas, il faut une NOUVELLE nature de signal pour les horizons longs, ex. funding, basis, agrégats).
 4. **Accepter la mesure** : l'outil a produit sa réponse — pas d'edge retail accessible sur BTC/ETH sub-minute avec des signaux prix/volume de base.
 
+## 5bis. Scan complet des 524 perpétuels UM (août 2026)
+
+L'analyse a été étendue à **tous les perpétuels USDⓈ-M négociables** (524/527 téléchargés, 491 vivants après filtrage). Résultat :
+
+**227 actifs (46 %) ont un edge net positif** avec le signal breakout (lb30, vf5, horizon 300 s), dont **41 avec >50 M$/jour de liquidité**.
+
+**Top 10 liquides** (edge net = brut breakout − 4 bps maker×maker) :
+
+| Actif | Edge net | Brut breakout | Vol/j | Vol 1m |
+|---|---|---|---|---|
+| SKRUSDT | +218 bps | 222 | 55 M$ | 31 bps |
+| ONGUSDT | +192 | 196 | 121 M$ | 41 |
+| BTRUSDT | +173 | 177 | 103 M$ | 48 |
+| BMTUSDT | +173 | 177 | 55 M$ | 45 |
+| ACEUSDT | +170 | 174 | 185 M$ | 52 |
+| TUTUSDT | +123 | 127 | 271 M$ | 78 |
+| TRUMPUSDT | +122 | 126 | 295 M$ | 23 |
+| HEIUSDT | +113 | 117 | 99 M$ | 49 |
+| APRUSDT | +95 | 99 | 88 M$ | 42 |
+| PROMUSDT | +93 | 97 | 97 M$ | 42 |
+
+**Interprétation** : sur BTC/ETH (vol 1m ~0.5-0.8 bps), l'edge breakout est +0.8 bps brut — borné par le bounce. Sur les alts volatils (vol 1m 23-78 bps), le même signal fait 90-220 bps brut — l'edge scale avec la volatilité de l'actif. La thèse réfutée sur BTC/ETH est **confirmée sur les alts** : la borne microstructure y est beaucoup plus haute.
+
+**Réserves honnêtes** : in-sample (une seule période) ; les fills réels sur ces actifs sont à valider ; le breakout_freq est faible (<1/jour pour la plupart) → peu de trades indépendants. La validation par la chaîne complète (walk-forward, stress, verdict) reste indispensable.
+
 ## 6. Impact sur la suite du projet
 
 La constitution exige un verdict go/no-go avant le réel : le verdict est **NO-GO** sur les données d'août pour les signaux testés. Le pipeline (temps réel → paper → live) reste construit pour en valider d'autres — mais passer au paper sans signal à edge positif n'a pas de sens : la prochaine étape utile est la recherche de signaux d'une autre nature, ou l'acceptation du résultat.
