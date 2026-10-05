@@ -38,6 +38,7 @@ def _register_builtins() -> None:
     from tradingv2.strategies.breakout import BreakoutVolume
     from tradingv2.strategies.breakout_hold import BreakoutFixedHold
     from tradingv2.strategies.buyhold import BuyHold
+    from tradingv2.strategies.cash_carry import CashCarryPerpLeg, CashCarrySpotLeg
     from tradingv2.strategies.flow import OrderFlowImbalance
     from tradingv2.strategies.funding import FundingMomentum
     from tradingv2.strategies.meanrev import MeanRevZScore
@@ -50,6 +51,8 @@ def _register_builtins() -> None:
     register_strategy("orderflow_imbalance", OrderFlowImbalance)
     register_strategy("buy_hold", BuyHold)
     register_strategy("time_series_trend", TimeSeriesTrend)
+    register_strategy("carry_spot_leg", CashCarrySpotLeg)
+    register_strategy("carry_perp_leg", CashCarryPerpLeg)
 
 
 _register_builtins()
