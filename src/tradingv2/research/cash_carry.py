@@ -147,6 +147,39 @@ def _transaction_cost(
     return qty * spot * spot_cost_bps / 1e4 + qty * perp * perp_cost_bps / 1e4
 
 
+def hedge_qty(
+    spot_close: float, perp_close: float, total_capital: float, hedge_fraction: float
+) -> float:
+    """Hedge quantity: capital fraction spread evenly across the two legs.
+
+    The fraction stays below 1 so entry fees and slippage can never exceed a
+    leg's cash balance or margin.
+    """
+    if total_capital <= 0.0:
+        raise ValueError("total_capital must be positive")
+    if not 0.0 < hedge_fraction < 1.0:
+        raise ValueError("hedge_fraction must be in (0, 1)")
+    for value, name in ((spot_close, "spot_close"), (perp_close, "perp_close")):
+        if not np.isfinite(value) or value <= 0.0:
+            raise ValueError(f"{name} must be finite and positive")
+    return hedge_fraction * total_capital / (spot_close + perp_close)
+
+
+def combine_leg_equities(
+    ts_spot: np.ndarray, eq_spot: np.ndarray, ts_perp: np.ndarray, eq_perp: np.ndarray
+) -> tuple[np.ndarray, np.ndarray]:
+    """Sum two aligned daily leg equity curves into one portfolio curve."""
+    spot_ts = np.asarray(ts_spot, dtype=np.int64)
+    spot_eq = np.asarray(eq_spot, dtype=float)
+    perp_ts = np.asarray(ts_perp, dtype=np.int64)
+    perp_eq = np.asarray(eq_perp, dtype=float)
+    if spot_ts.shape != spot_eq.shape or perp_ts.shape != perp_eq.shape:
+        raise ValueError("leg timestamps and equity values must be equally sized")
+    if not np.array_equal(spot_ts, perp_ts):
+        raise ValueError("leg daily marks do not align")
+    return spot_ts, spot_eq + perp_eq
+
+
 def _sum_between(
     timestamps: np.ndarray, rates: np.ndarray, start_exclusive: int, end_inclusive: int
 ) -> float:

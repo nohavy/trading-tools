@@ -1,13 +1,16 @@
 # Tâches: carry toujours couvert dans le moteur événementiel
 
-- [ ] T001 Spécifier et planifier (fait à la création de la feature).
-- [ ] T002 Configs spot 1m BTC/ETH 2023-04→2026-08 et téléchargement vérifié.
-- [ ] T003 Tests RED des jambes: entrée unique post-`trade_start_ns`, quantité
+- [x] T001 Spécifier et planifier (fait à la création de la feature).
+- [x] T002 Configs spot 1m BTC/ETH 2023-04→2026-08 et téléchargement vérifié
+      (35+6 mois convertis par actif) ; règles d'instruments réelles
+      téléchargées (spot/um × BTC/ETH).
+- [x] T003 Tests RED des jambes: entrée unique post-`trade_start_ns`, quantité
       exacte, aucune sortie, pas de double soumission.
-- [ ] T004 Implémenter `CashCarrySpotLeg` / `CashCarryPerpLeg` (GREEN) et les
+- [x] T004 Implémenter `CashCarrySpotLeg` / `CashCarryPerpLeg` (GREEN) et les
       enregistrer dans `builtin.py`.
-- [ ] T005 Runner de validation: deux jambes par actif, equity daily combinée,
-      synthèse Newey-West et checks de fidélité (fills, rejets, couverture).
+- [x] T005 Runner de validation: deux jambes par actif, equity daily combinée,
+      synthèse Newey-West et checks de fidélité (fills, rejets, couverture),
+      helpers `hedge_qty` et `combine_leg_equities` testés.
 - [ ] T006 Exécuter BTCUSDT et ETHUSDT avec funding, fees, slippage, latence.
 - [ ] T007 Rapprochement écran vs moteur documenté, verdict selon les critères
       figés (t ≥ 2,0, DD ≤ 25 %, OOS > 0).

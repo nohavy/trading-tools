@@ -1,0 +1,45 @@
+symbol: BTCUSDT
+total_capital: 20000
+hedge_fraction: 0.95
+# First OOS daily-close boundary: 2023-07-01 00:00 UTC.
+trade_start_ns: 1688169600000000000
+legs:
+  spot:
+    strategy: carry_spot_leg
+    data:
+      market: spot
+      kind: klines
+      interval: 1m
+      start: 2023-06-30
+      end: 2026-08-31
+    account:
+      type: spot
+      balance: 10000
+    costs:
+      maker_bps: 10
+      taker_bps: 10
+      slippage_bps: 1
+      latency:
+        mean_ms: 150
+        jitter_ms: 50
+        seed: 42
+  perp:
+    strategy: carry_perp_leg
+    data:
+      market: um
+      kind: klines
+      interval: 1m
+      start: 2023-06-30
+      end: 2026-08-31
+    account:
+      type: margin
+      balance: 10000
+      leverage: 2
+    costs:
+      maker_bps: 5
+      taker_bps: 5
+      slippage_bps: 1
+      latency:
+        mean_ms: 150
+        jitter_ms: 50
+        seed: 42

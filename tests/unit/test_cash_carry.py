@@ -3,7 +3,11 @@
 import numpy as np
 import pytest
 
-from tradingv2.research.cash_carry import simulate_cash_and_carry
+from tradingv2.research.cash_carry import (
+    combine_leg_equities,
+    hedge_qty,
+    simulate_cash_and_carry,
+)
 
 DAY = 86_400_000_000_000
 
@@ -85,3 +89,27 @@ def test_future_funding_cannot_trigger_entry() -> None:
         entry_basis=-1.0, exit_basis=-1.0, spot_cost_bps=0.0, perp_cost_bps=0.0,
     )
     assert result.position[0] == 0.0
+
+
+def test_hedge_qty_spreads_capital_across_both_legs() -> None:
+    assert hedge_qty(100.0, 100.0, 20_000.0, 0.95) == pytest.approx(95.0)
+    with pytest.raises(ValueError, match="hedge_fraction"):
+        hedge_qty(100.0, 100.0, 20_000.0, 1.0)
+    with pytest.raises(ValueError, match="total_capital"):
+        hedge_qty(100.0, 100.0, 0.0, 0.95)
+    with pytest.raises(ValueError, match="perp_close"):
+        hedge_qty(100.0, 0.0, 20_000.0, 0.95)
+
+
+def test_combine_leg_equities_sums_aligned_daily_marks() -> None:
+    ts = np.array([0, DAY], dtype=np.int64)
+    combined_ts, combined_eq = combine_leg_equities(
+        ts, np.array([10_000.0, 11_000.0]), ts, np.array([10_000.0, 10_500.0])
+    )
+    assert np.array_equal(combined_ts, ts)
+    assert combined_eq.tolist() == pytest.approx([20_000.0, 21_500.0])
+    with pytest.raises(ValueError, match="do not align"):
+        combine_leg_equities(
+            ts, np.array([10_000.0, 11_000.0]),
+            np.array([1, 2], dtype=np.int64), np.array([10_000.0, 10_500.0]),
+        )
