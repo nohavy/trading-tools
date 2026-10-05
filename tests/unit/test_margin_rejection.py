@@ -1,10 +1,11 @@
 """Tests for clean margin rejection: no corruption, no illegal transitions."""
 
+import polars as pl
 import pytest
 
 from tradingv2.backtest.engine import Engine
 from tradingv2.config import Market
-from tradingv2.core.types import OrderStatus, PriceBar, Side
+from tradingv2.core.types import Fill, FillRole, Order, OrderStatus, OrderType, PriceBar, Side
 from tradingv2.costs.fees import FeeSchedule
 from tradingv2.costs.latency import LatencyModel
 from tradingv2.costs.slippage import SlippageModel
@@ -80,4 +81,52 @@ def test_margin_check_happens_before_mutation() -> None:
         account.apply_fill(fill)  # 0.5*5000/5 = 500 > 100
     # no partial mutation: balance and position untouched
     assert account.balance == pytest.approx(100.0)
+    assert account.position == pytest.approx(0.0)
+
+
+def test_closing_a_position_below_initial_margin_is_allowed() -> None:
+    """An exit releases margin and must not be rejected as a new full-size trade."""
+    account = MarginAccount(balance=10_000.0, leverage=1)
+    entry = Fill(
+        order_id=1,
+        ts_ns=0,
+        price=10_000.0,
+        qty=1.0,
+        fee=5.0,
+        role=FillRole.TAKER,
+        side=Side.BUY,
+    )
+    account.apply_fill(entry)
+    assert account.equity(9_000.0) == pytest.approx(8_995.0)
+
+    tape = pl.DataFrame(
+        {
+            "ts_ns": [S],
+            "price": [9_000.0],
+            "qty": [2.0],
+            "buyer_is_maker": [True],
+        }
+    )
+    exchange = SimulatedExchange(
+        rules=RULES,
+        account=account,
+        fees=FeeSchedule(maker_bps=2.0, taker_bps=5.0),
+        slippage=SlippageModel(bps=0.0),
+        latency=LatencyModel(mean_ms=0.0, jitter_ms=0.0, seed=1),
+        tape=tape,
+    )
+    exit_order = Order(
+        id=1,
+        symbol="BTCUSDT",
+        side=Side.SELL,
+        type=OrderType.MARKET,
+        qty=1.0,
+        submitted_ns=0,
+    )
+    exchange.submit(exit_order)
+    exchange.advance_to(0)
+    assert exit_order.status.value == OrderStatus.ACTIVE.value
+    fills = exchange.advance_to(S)
+    assert len(fills) == 1
+    assert exit_order.status.value == OrderStatus.FILLED.value
     assert account.position == pytest.approx(0.0)

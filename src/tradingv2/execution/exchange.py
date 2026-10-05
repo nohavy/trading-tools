@@ -446,8 +446,23 @@ class SimulatedExchange:
                     raise AccountError(f"insufficient quote for {order.qty} at {price}")
             return
         if isinstance(self.account, MarginAccount):
-            notional = order.qty * price
-            margin_used = notional / self.account.leverage
+            current_position = self.account.position
+            signed_order_qty = order.qty if order.side == Side.BUY else -order.qty
+            if current_position == 0.0 or current_position * signed_order_qty > 0.0:
+                # New exposure in the same direction consumes margin in addition
+                # to the margin already occupied by the open position.
+                margin_used = (
+                    abs(current_position) * self.account.entry_price
+                    + order.qty * price
+                ) / self.account.leverage
+            else:
+                # Closing trades release margin. Only the residual exposure of
+                # a position flip needs new margin; a pure reduction must never
+                # be rejected merely because account equity fell below notional.
+                added_qty = max(0.0, order.qty - abs(current_position))
+                if added_qty == 0.0:
+                    return
+                margin_used = added_qty * price / self.account.leverage
             if margin_used > self.account.equity(price):
                 raise AccountError(
                     f"insufficient margin: used {margin_used} > equity {self.account.equity(price)}"
