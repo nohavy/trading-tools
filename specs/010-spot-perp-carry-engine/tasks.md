@@ -11,9 +11,15 @@
 - [x] T005 Runner de validation: deux jambes par actif, equity daily combinée,
       synthèse Newey-West et checks de fidélité (fills, rejets, couverture),
       helpers `hedge_qty` et `combine_leg_equities` testés.
-- [ ] T006 Exécuter BTCUSDT et ETHUSDT avec funding, fees, slippage, latence.
-- [ ] T007 Rapprochement écran vs moteur documenté, verdict selon les critères
-      figés (t ≥ 2,0, DD ≤ 25 %, OOS > 0).
-- [ ] T008 Quality gates: suite hors net/slow, Ruff et mypy verts (l'échec
-      connu du benchmark `slow` `test_sweep_8_configs_on_real_month` est
-      documenté aux tasks 008/009 et sans rapport).
+- [x] T006 Exécuter BTCUSDT et ETHUSDT avec funding, fees, slippage, latence.
+- [x] T007 Rapprochement écran vs moteur documenté, verdict selon les critères
+      figés (t ≥ 2,0, DD ≤ 25 %, OOS > 0) : tous passés (t 7,20/6,04,
+      DD 0,38 %/0,29 %, 1 fill/jambe, 0 rejet) — `docs/carry-engine-result-2026-10.md`.
+      L'écart avec l'écran 2020 (+49 %) est un effet de vintage expliqué et
+      reproduit analytiquement, pas un défaut moteur.
+- [x] T008 Quality gates: suite hors net/slow 504 verts, Ruff et mypy stricts
+      verts. Correction associée: `_rules_for` lit les règles d'instruments
+      via `data_root` du run (le couplage à `data/` du repo cassait les tests
+      stress avec les règles réelles minNotional UM 50 USDT désormais
+      présentes). Les tasks 008/009 documentent l'unique échec du benchmark
+      `slow` `test_sweep_8_configs_on_real_month`, sans rapport.
