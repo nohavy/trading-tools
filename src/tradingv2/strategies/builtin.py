@@ -41,6 +41,7 @@ def _register_builtins() -> None:
     from tradingv2.strategies.flow import OrderFlowImbalance
     from tradingv2.strategies.funding import FundingMomentum
     from tradingv2.strategies.meanrev import MeanRevZScore
+    from tradingv2.strategies.time_series_trend import TimeSeriesTrend
 
     register_strategy("breakout_hold", BreakoutFixedHold)
     register_strategy("funding_momentum", FundingMomentum)
@@ -48,6 +49,7 @@ def _register_builtins() -> None:
     register_strategy("breakout_volume", BreakoutVolume)
     register_strategy("orderflow_imbalance", OrderFlowImbalance)
     register_strategy("buy_hold", BuyHold)
+    register_strategy("time_series_trend", TimeSeriesTrend)
 
 
 _register_builtins()

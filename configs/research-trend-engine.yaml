@@ -1,0 +1,26 @@
+data:
+  market: um
+  kind: klines
+  symbol: BTCUSDT
+  interval: 1m
+  start: 2023-04-01
+  end: 2026-08-31
+account:
+  type: margin
+  balance: 10000
+  leverage: 1
+costs:
+  maker_bps: 2
+  taker_bps: 5
+  slippage_bps: 1
+  latency:
+    mean_ms: 150
+    jitter_ms: 50
+    seed: 42
+strategy:
+  name: time_series_trend
+  params:
+    lookback_days: 60
+    mode: long_flat
+    target_exposure: 1
+    trade_start_ns: 1688169600000000000
