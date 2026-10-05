@@ -134,7 +134,7 @@ def run_backtest(
     else:
         account = SpotAccount(quote_balance=cfg.account.balance)
     exchange = SimulatedExchange(
-        rules=_rules_for(cfg),
+        rules=_rules_for(cfg, data_root),
         account=account,
         fees=FeeSchedule(maker_bps=cfg.costs.maker_bps, taker_bps=cfg.costs.taker_bps),
         slippage=SlippageModel(bps=cfg.costs.slippage_bps),
@@ -173,14 +173,14 @@ def run_backtest(
     )
 
 
-def _rules_for(cfg: BacktestConfig) -> InstrumentRules:
+def _rules_for(cfg: BacktestConfig, data_root: Path) -> InstrumentRules:
     from tradingv2.config import Market
     from tradingv2.data.instruments import InstrumentError, load_instrument_rules
 
 
     market = Market(cfg.data.market)
     try:
-        return load_instrument_rules(Path("data"), market, cfg.data.symbol)
+        return load_instrument_rules(data_root, market, cfg.data.symbol)
     except InstrumentError:
         # sensible defaults when instruments were not fetched yet (tests, first runs)
         return InstrumentRules(
