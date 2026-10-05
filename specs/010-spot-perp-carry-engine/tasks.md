@@ -23,3 +23,7 @@
       stress avec les règles réelles minNotional UM 50 USDT désormais
       présentes). Les tasks 008/009 documentent l'unique échec du benchmark
       `slow` `test_sweep_8_configs_on_real_month`, sans rapport.
+- [x] T009 Stress du candidat dans le moteur (frais ×1,5, slippage ×2,
+      latence +250 ms, combiné) sur BTC et ETH : survit partout, au pire
+      4 bps au combiné — `docs/carry-stress-result-2026-10.md`.
+      Prochaine étape : holdout pré-enregistré.
