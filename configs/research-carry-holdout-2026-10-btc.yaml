@@ -1,0 +1,53 @@
+# Holdout verrouillé 2026-10 — protocole figé docs/carry-holdout-2026-10-prereg.md
+symbol: BTCUSDT
+total_capital: 20000
+hedge_fraction: 0.95
+# Entrée à la première clôture daily >= 2026-10-01 00:00 UTC.
+trade_start_ns: 1790812800000000000
+# Dimensionnement sur la clôture du 2026-09-30 (seul emprunt à septembre).
+qty_date: 2026-09-30
+# Fenêtre verrouillée : marques daily 2026-10-01 00:00 -> 2026-11-01 00:00 inclus.
+oos_start_ns: 1790812800000000000
+oos_end_ns: 1793491200000000000
+oos_end_inclusive: true
+oos_subperiods: false
+legs:
+  spot:
+    strategy: carry_spot_leg
+    data:
+      market: spot
+      kind: klines
+      interval: 1m
+      start: 2026-09-30
+      end: 2026-10-31
+    account:
+      type: spot
+      balance: 10000
+    costs:
+      maker_bps: 10
+      taker_bps: 10
+      slippage_bps: 1
+      latency:
+        mean_ms: 150
+        jitter_ms: 50
+        seed: 42
+  perp:
+    strategy: carry_perp_leg
+    data:
+      market: um
+      kind: klines
+      interval: 1m
+      start: 2026-09-30
+      end: 2026-10-31
+    account:
+      type: margin
+      balance: 10000
+      leverage: 2
+    costs:
+      maker_bps: 5
+      taker_bps: 5
+      slippage_bps: 1
+      latency:
+        mean_ms: 150
+        jitter_ms: 50
+        seed: 42

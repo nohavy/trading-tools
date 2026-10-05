@@ -60,19 +60,22 @@ def _daily_close(
 
 
 def _hedge_qty_for(data_root: Path, symbol: str, cfg: dict[str, Any]) -> float:
+    qty_date = dt.date.fromisoformat(
+        str(cfg.get("qty_date", DECISION_DATE.isoformat()))
+    )
     spot_close = _daily_close(
         data_root,
         data_root / "parquet" / "spot" / "klines" / symbol / "1d",
         symbol,
-        f"{symbol}-1d-{DECISION_DATE.year}-{DECISION_DATE.month:02d}.parquet",
-        DECISION_DATE,
+        f"{symbol}-1d-{qty_date.year}-{qty_date.month:02d}.parquet",
+        qty_date,
     )
     perp_close = _daily_close(
         data_root,
         data_root / "daily" / "um" / symbol,
         symbol,
-        f"{symbol}-1d-{DECISION_DATE.year}-{DECISION_DATE.month:02d}.parquet",
-        DECISION_DATE,
+        f"{symbol}-1d-{qty_date.year}-{qty_date.month:02d}.parquet",
+        qty_date,
     )
     return hedge_qty(
         spot_close,
@@ -124,12 +127,15 @@ def _leg_stats(run_dir: Path) -> dict[str, Any]:
     }
 
 
-def _daily_curve(run_dir: Path) -> tuple[np.ndarray, np.ndarray]:
+def _daily_curve(
+    run_dir: Path, start_ns: int, end_ns: int, *, end_inclusive: bool
+) -> tuple[np.ndarray, np.ndarray]:
     equity = pl.read_csv(run_dir / "equity.csv").sort("ts_ns")
+    upper = pl.col("ts_ns") <= end_ns if end_inclusive else pl.col("ts_ns") < end_ns
     daily = (
         equity.filter(
-            (pl.col("ts_ns") >= _ns(OOS_START))
-            & (pl.col("ts_ns") < _ns(OOS_END))
+            (pl.col("ts_ns") >= start_ns)
+            & upper
             & (pl.col("ts_ns") % DAY_NS == 0)
         )
         .unique(subset=["ts_ns"], keep="last")
@@ -138,22 +144,27 @@ def _daily_curve(run_dir: Path) -> tuple[np.ndarray, np.ndarray]:
     return daily["ts_ns"].to_numpy(), daily["equity"].to_numpy()
 
 
-def _summarize(ts: np.ndarray, equity: np.ndarray) -> dict[str, Any]:
-    def _one(start: dt.datetime, end: dt.datetime) -> dict[str, Any]:
-        return summarize_daily_equity_curve(
-            ts, equity, start_ns=_ns(start), end_ns=_ns(end), hac_lag=20
-        )
+def _summarize(
+    ts: np.ndarray, equity: np.ndarray, start_ns: int, end_ns: int, *, subperiods: bool
+) -> dict[str, Any]:
+    def _one(start: int, end: int) -> dict[str, Any]:
+        return summarize_daily_equity_curve(ts, equity, start_ns=start, end_ns=end, hac_lag=20)
 
-    return {
-        "full": _one(OOS_START, OOS_END),
-        "subperiods": {
-            name: _one(start, end) for name, (start, end) in OOS_SUBPERIODS.items()
-        },
-    }
+    oos = {"full": _one(start_ns, end_ns)}
+    if subperiods:
+        oos["subperiods"] = {
+            name: _one(_ns(start), _ns(end))
+            for name, (start, end) in OOS_SUBPERIODS.items()
+        }
+    return oos
 
 
 def run_symbol_cfg(cfg: dict[str, Any], *, data_root: Path, runs_root: Path) -> dict[str, Any]:
     symbol = str(cfg["symbol"])
+    oos_start_ns = int(cfg.get("oos_start_ns", _ns(OOS_START)))
+    oos_end_ns = int(cfg.get("oos_end_ns", _ns(OOS_END)))
+    end_inclusive = bool(cfg.get("oos_end_inclusive", False))
+    subperiods = bool(cfg.get("oos_subperiods", True))
     qty = _hedge_qty_for(data_root, symbol, cfg)
     trade_start_ns = int(cfg["trade_start_ns"])
 
@@ -168,7 +179,9 @@ def run_symbol_cfg(cfg: dict[str, Any], *, data_root: Path, runs_root: Path) -> 
         )
         stats = _leg_stats(run_dir)
         legs[leg_name] = stats
-        curves.append(_daily_curve(run_dir))
+        curves.append(
+            _daily_curve(run_dir, oos_start_ns, oos_end_ns, end_inclusive=end_inclusive)
+        )
         fill_qtys.append(stats["fill_qty"])
         print(f"  fills={stats['n_fills']} rejected={stats['n_rejected']}", flush=True)
         del run_dir
@@ -188,7 +201,7 @@ def run_symbol_cfg(cfg: dict[str, Any], *, data_root: Path, runs_root: Path) -> 
         "hedge_qty": qty,
         "coverage_ratio": coverage,
         "legs": legs,
-        "oos": _summarize(ts, combined),
+        "oos": _summarize(ts, combined, oos_start_ns, oos_end_ns, subperiods=subperiods),
         "combined_equity_end_usdt": float(combined[-1]),
         "combined_equity_start_usdt": float(combined[0]),
     }
