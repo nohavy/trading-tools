@@ -152,8 +152,7 @@ def _summarize(ts: np.ndarray, equity: np.ndarray) -> dict[str, Any]:
     }
 
 
-def run_symbol(data_root: Path, runs_root: Path, config_path: Path) -> dict[str, Any]:
-    cfg = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+def run_symbol_cfg(cfg: dict[str, Any], *, data_root: Path, runs_root: Path) -> dict[str, Any]:
     symbol = str(cfg["symbol"])
     qty = _hedge_qty_for(data_root, symbol, cfg)
     trade_start_ns = int(cfg["trade_start_ns"])
@@ -193,6 +192,11 @@ def run_symbol(data_root: Path, runs_root: Path, config_path: Path) -> dict[str,
         "combined_equity_end_usdt": float(combined[-1]),
         "combined_equity_start_usdt": float(combined[0]),
     }
+
+
+def run_symbol(data_root: Path, runs_root: Path, config_path: Path) -> dict[str, Any]:
+    cfg = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    return run_symbol_cfg(cfg, data_root=data_root, runs_root=runs_root)
 
 
 def main() -> None:
