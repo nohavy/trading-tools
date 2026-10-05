@@ -1,5 +1,8 @@
 data/
 runs/
+.env
+.env.*
+.hypothesis/
 __pycache__/
 *.pyc
 .venv/
