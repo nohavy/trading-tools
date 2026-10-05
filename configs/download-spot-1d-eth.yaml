@@ -1,0 +1,7 @@
+data:
+  market: spot
+  kind: klines
+  symbol: ETHUSDT
+  interval: 1d
+  start: 2020-01-01
+  end: 2026-08-31
