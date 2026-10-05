@@ -42,7 +42,43 @@ class RunnerError(Exception):
     """Raised when a backtest cannot be prepared (data, strategy, catalog)."""
 
 
+# Process-local, single-slot bar cache: a sweep or stress run replays the same
+# data spec many times and the loop overhead is the dominant cost. PriceBar
+# being an immutable dataclass, sharing instances across runs is safe.
+_BAR_CACHE: dict[tuple[object, ...], list[PriceBar]] = {}
+
+
+def _bar_cache_key(
+    cfg: BacktestConfig, data_root: Path, bar_bounds: tuple[int, int] | None
+) -> tuple[object, ...]:
+    data = cfg.data
+    return (
+        str(data_root),
+        data.market,
+        data.kind,
+        data.symbol,
+        data.interval,
+        data.start.isoformat(),
+        data.end.isoformat(),
+        data.tape,
+        bar_bounds,
+    )
+
+
 def _load_bars(
+    cfg: BacktestConfig, data_root: Path, bar_bounds: tuple[int, int] | None = None
+) -> list[PriceBar]:
+    key = _bar_cache_key(cfg, data_root, bar_bounds)
+    cached = _BAR_CACHE.get(key)
+    if cached is not None:
+        return cached
+    bars = _load_bars_uncached(cfg, data_root, bar_bounds)
+    _BAR_CACHE.clear()  # single slot: cap memory at one bar list per process
+    _BAR_CACHE[key] = bars
+    return bars
+
+
+def _load_bars_uncached(
     cfg: BacktestConfig, data_root: Path, bar_bounds: tuple[int, int] | None = None
 ) -> list[PriceBar]:
     catalog_path = data_root / "catalog.json"
