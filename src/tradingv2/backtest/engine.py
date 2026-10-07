@@ -66,12 +66,12 @@ class Engine:
         self,
         exchange: SimulatedExchange,
         strategy: Strategy,
-        bars: list[PriceBar],
+        bars: list[PriceBar] | None = None,
         initial_equity: float = 0.0,
     ) -> None:
         self.exchange = exchange
         self.strategy = strategy
-        self.bars = sorted(bars, key=lambda b: b.ts_close_ns)
+        self.bars = sorted(bars or [], key=lambda b: b.ts_close_ns)
         self._bar_by_close: dict[int, PriceBar] = {}
         for bar in self.bars:
             self._bar_by_close[bar.ts_close_ns] = bar
@@ -86,6 +86,9 @@ class Engine:
         self._timers: set[int] = set()
         self._ledger = Ledger()
         self._round_trips: list[RoundTrip] = []
+        self._started = False
+        self._ended = False
+        self._ctx: Context | None = None
         # round-trip accumulators
         self._trip_open = False
         self._trip_entry_ts = 0
@@ -96,6 +99,90 @@ class Engine:
         self._trip_fees = 0.0
         self._trip_slippage = 0.0
         self._trip_funding = 0.0
+
+    # ------------------------------------------------ shared mechanics ----
+    def _ensure_started(self) -> Context:
+        """Create the Context once and call on_start exactly once."""
+        if self._ctx is None:
+            ctx = Context(now_ns=0, exchange=self.exchange)
+            ctx._closed_bars = self._closed_bars
+            ctx.on_timer_scheduled = self._on_timer_scheduled
+            self._ctx = ctx
+        if not self._started:
+            self._started = True
+            self.strategy.on_start(self._ctx)
+        return self._ctx
+
+    def _dispatch_fills(self, ctx: Context, fills: list[FillEvent]) -> None:
+        for fill_event in fills:
+            self._fill_events.append(fill_event)
+            self.strategy.on_fill(ctx, fill_event)
+            self._account_fill(ctx, fill_event)
+
+    def _apply_settlement(self, ctx: Context, ts_ns: int, rate: float) -> None:
+        """Advance the exchange to the settlement, apply funding, notify."""
+        ctx.now_ns = ts_ns
+        self._dispatch_fills(ctx, self.exchange.advance_to(ts_ns))
+        self._apply_funding(ts_ns, rate)
+        # the strategy sees the funding AFTER the accounting
+        self.strategy.on_funding(ctx, rate)
+
+    def _apply_bar(self, ctx: Context, bar: PriceBar) -> None:
+        """One closed bar through the constitutional ordering (bars-only mode).
+
+        Stops fire first, then limits, then market orders — each phase
+        delivers fills so the strategy's bracket guard can cancel pending
+        exits between phases.
+        """
+        ctx.now_ns = bar.ts_close_ns
+        self._dispatch_fills(ctx, self.exchange.advance_to(bar.ts_close_ns))
+        self._closed_bars.append(bar)
+        for evaluate in (
+            self.exchange.evaluate_stop_orders,
+            self.exchange.evaluate_limit_orders,
+            self.exchange.evaluate_market_orders,
+        ):
+            self._dispatch_fills(ctx, evaluate(bar))
+        self._equity_curve.append((bar.ts_close_ns, self.exchange.account.equity(bar.close)))
+        self.strategy.on_bar(ctx, bar)
+
+    def _fire_timers(self, ctx: Context, upper_ns: int, *, include_upper: bool) -> None:
+        """Fire due timers in order; pending arrivals deliver first, as in run()."""
+        due = sorted(
+            t
+            for t in self._timers
+            if (t <= upper_ns if include_upper else t < upper_ns)
+        )
+        for t in due:
+            self._timers.discard(t)
+        for t in due:
+            ctx.now_ns = t
+            self._dispatch_fills(ctx, self.exchange.advance_to(t))
+            self.strategy.on_timer(ctx)
+
+    def result(self, mark: float | None = None) -> EngineResult:
+        """Snapshot of accumulated state without ending the strategy."""
+        if mark is None:
+            mark = self.exchange.last_price or 0.0
+        return EngineResult(
+            n_bars=len(self._closed_bars),
+            fill_events=self._fill_events,
+            equity_curve=self._equity_curve,
+            final_equity=self.exchange.account.equity(mark),
+            orders=list(self.exchange._orders.values()),
+            round_trips=self._round_trips,
+            ledger_totals=self._ledger.totals(),
+        )
+
+    def finish(self, final_mark: float | None = None) -> EngineResult:
+        """Call on_end once and return the final snapshot (paper shutdown)."""
+        ctx = self._ensure_started()
+        mark = final_mark if final_mark is not None else (self.exchange.last_price or 0.0)
+        ctx.now_ns = int(mark) if not isinstance(mark, int) else mark
+        if not self._ended:
+            self._ended = True
+            self.strategy.on_end(ctx)
+        return self.result(mark=mark)
 
     def _on_timer_scheduled(self, ts_ns: int) -> None:
         """Callback used by the Context to register a timer in the engine heap."""
@@ -157,6 +244,26 @@ class Engine:
         if self._trip_open:
             self._trip_funding += paid
 
+    def process_bar(
+        self, bar: PriceBar, funding_events: list[FundingEvent] | None = None
+    ) -> list[FillEvent]:
+        """Feed one closed bar as it arrives (paper): same ordering as run().
+
+        Funding settlements at or before the bar close apply first (at equal
+        timestamps funding beats bars, matching the backtest heap); timers
+        strictly between events fire before the bar; timers at the bar close
+        fire after it. Returns only the fills delivered during this bar.
+        """
+        ctx = self._ensure_started()
+        delivered_before = len(self._fill_events)
+        self._fire_timers(ctx, bar.ts_close_ns, include_upper=False)
+        for event in sorted(funding_events or [], key=lambda f: f.ts_ns):
+            if event.ts_ns <= bar.ts_close_ns:
+                self._apply_settlement(ctx, event.ts_ns, event.rate)
+        self._apply_bar(ctx, bar)
+        self._fire_timers(ctx, bar.ts_close_ns, include_upper=True)
+        return self._fill_events[delivered_before:]
+
     def run(self, funding_events: list[FundingEvent] | None = None) -> EngineResult:
         """Run the whole backtest and return raw results."""
         funding_by_ts: dict[int, float] = {f.ts_ns: f.rate for f in (funding_events or [])}
@@ -166,11 +273,7 @@ class Engine:
             self._push(heap, funding.ts_ns, priority=1)
         for bar in self.bars:
             self._push(heap, bar.ts_close_ns, priority=1)
-        ctx = Context(now_ns=0, exchange=self.exchange)
-        ctx._closed_bars = self._closed_bars
-        ctx.on_timer_scheduled = self._on_timer_scheduled
-        self.strategy.on_start(ctx)
-
+        ctx = self._ensure_started()
         while heap:
             # timers registered by the strategy join the heap before each pop
             while self._timers:
@@ -181,52 +284,18 @@ class Engine:
             ctx.now_ns = event.ts
 
             # 1) exchange first, always: arrivals and scheduled fills up to now
-            fills = self.exchange.advance_to(event.ts)
-            for fill_event in fills:
-                self._fill_events.append(fill_event)
-                self.strategy.on_fill(ctx, fill_event)
-                self._account_fill(ctx, fill_event)
-
-            # 2) then the event itself
             if event.priority == 1:  # bar close and/or funding settlement at this ts
                 # pop both mappings: a funding ts may coincide with a bar close;
                 # each must be consumed exactly once
                 rate = funding_by_ts.pop(event.ts, None)
                 bar = self._bar_by_close.pop(event.ts, None)  # type: ignore[arg-type]
                 if rate is not None:
-                    self._apply_funding(event.ts, rate)
-                    # the strategy sees the funding AFTER the accounting
-                    self.strategy.on_funding(ctx, rate)
-                if bar is None:
-                    continue
-                self._closed_bars.append(bar)
-                # bars-only mode: stops fire first, then limits, then market
-                # orders — each phase delivers fills so the strategy's bracket
-                # guard can cancel pending exits between phases
-                for evaluate in (
-                    self.exchange.evaluate_stop_orders,
-                    self.exchange.evaluate_limit_orders,
-                    self.exchange.evaluate_market_orders,
-                ):
-                    for fill_event in evaluate(bar):
-                        self._fill_events.append(fill_event)
-                        self.strategy.on_fill(ctx, fill_event)
-                        self._account_fill(ctx, fill_event)
-                self._equity_curve.append((event.ts, self.exchange.account.equity(bar.close)))
-                self.strategy.on_bar(ctx, bar)
+                    self._apply_settlement(ctx, event.ts, rate)
+                if bar is not None:
+                    self._apply_bar(ctx, bar)
             elif event.priority == 2:  # timer
+                self._dispatch_fills(ctx, self.exchange.advance_to(event.ts))
                 self.strategy.on_timer(ctx)
 
-        last_close = self.bars[-1].ts_close_ns if self.bars else 0
         final_mark = self.bars[-1].close if self.bars else (self.exchange.last_price or 0.0)
-        ctx.now_ns = last_close
-        self.strategy.on_end(ctx)
-        return EngineResult(
-            n_bars=len(self.bars),
-            fill_events=self._fill_events,
-            equity_curve=self._equity_curve,
-            final_equity=self.exchange.account.equity(final_mark),
-            orders=list(self.exchange._orders.values()),
-            round_trips=self._round_trips,
-            ledger_totals=self._ledger.totals(),
-        )
+        return self.finish(final_mark=final_mark)
