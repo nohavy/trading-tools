@@ -1,0 +1,57 @@
+# Replication moteur du carry toujours couvert sur l'IS vectoriel 2020-2023
+# (diagnostic de résilience bear, paramètres figés de la feature 010).
+# L'IS 2020-01→2023-06 inclut le bear 2022 — sa fenêtre a été consultée par
+# l'écran : c'est un contrôle de fidélité d'exécution, pas un holdout.
+symbol: ETHUSDT
+total_capital: 20000
+hedge_fraction: 0.95
+# Entrée à la première clôture daily >= 2020-01-08 00:00 UTC, identique à
+# l'entrée de l'écran toujours couvert (décision à la clôture du 2020-01-07).
+trade_start_ns: 1578441600000000000
+# Dimensionnement sur la clôture du jour de décision (2020-01-07).
+qty_date: 2020-01-07
+# Fenêtre: marques daily 2020-01-08 00:00 -> 2023-07-01 00:00 exclusif.
+oos_start_ns: 1578441600000000000
+oos_end_ns: 1688169600000000000
+oos_end_inclusive: false
+oos_subperiods: false
+legs:
+  spot:
+    strategy: carry_spot_leg
+    data:
+      market: spot
+      kind: klines
+      interval: 1m
+      start: 2020-01-01
+      end: 2023-06-30
+    account:
+      type: spot
+      balance: 10000
+    costs:
+      maker_bps: 10
+      taker_bps: 10
+      slippage_bps: 1
+      latency:
+        mean_ms: 150
+        jitter_ms: 50
+        seed: 42
+  perp:
+    strategy: carry_perp_leg
+    data:
+      market: um
+      kind: klines
+      interval: 1m
+      start: 2020-01-01
+      end: 2023-06-30
+    account:
+      type: margin
+      balance: 10000
+      leverage: 2
+    costs:
+      maker_bps: 5
+      taker_bps: 5
+      slippage_bps: 1
+      latency:
+        mean_ms: 150
+        jitter_ms: 50
+        seed: 42

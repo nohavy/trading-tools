@@ -71,9 +71,9 @@ partir de ces chiffres.
 
 - Entrée unique au 2023-07-01 : la période 2020-2023 est volontairement hors
   champ (l'entrée fraîche est le point de comparaison voulu) ; la résilience
-  2020-2022 (bear 2022, funding négatif épisodique) n'est pas couverte par
-  ce run — l'attelage 2020→2026 vectoriel reste positif, mais la vérification
-  moteur sur le bear n'existe pas encore.
+  2020-2022 (bear 2022, funding négatif épisodique) **a depuis été rejouée
+  au moteur** — voir `docs/carry-bear-2020-2022.md` : +121 % BTC / +341 % ETH
+  sur l'IS, DD ≤ 2,24 %, fidélité vectorielle corr ≥ 0,999.
 - Un seul actif par run moteur (agrégation en portefeuille par runs) ; la
   synchronisation des deux jambes repose sur la même frontière daily.
 - Short perp en compte margin levier interne 2 : marge requise ≈ 4,8 k sur

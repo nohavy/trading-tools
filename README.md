@@ -27,7 +27,7 @@ walk-forward, holdout pré-enregistré) puis rejouée dans un moteur
 | 007–008 | Trend temporel 60j long/flat BTC/ETH | **NO-GO** — t = 1,53 < 2,0 et DD 36,8 % > 25 % |
 | — | Holdout pré-enregistré septembre 2026 (trend 60j) | **NO-GO** — équivalent à buy-and-hold, aucune valeur ajoutée |
 | 009 | Carry neutre spot/perp pré-enregistré | **Premier écran validé** (t 4-6, DD 0,2-0,6 %) mais le filtre de timing détruit la valeur ; **le toujours couvert** (+49,4 % OOS) devient le candidat |
-| 010 | Carry toujours couvert dans le moteur 1m | **Validé moteur** — t 7,20/6,04, DD 0,38/0,29 %, fidélité vectorielle établie, stress franchi ; holdout pré-enregistré = prochaine étape |
+| 010 | Carry toujours couvert dans le moteur 1m | **Validé moteur** — t 7,20/6,04, DD 0,38/0,29 %, fidélité vectorielle établie, stress franchi, bear 2020-22 rejoué (+121 %/+341 % IS, corr ≥ 0,999) ; holdout pré-enregistré = prochaine étape |
 
 ## Installation
 
