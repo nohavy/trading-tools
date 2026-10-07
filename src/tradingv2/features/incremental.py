@@ -7,6 +7,8 @@ strategy validated on the vectorized version behaves identically in real time.
 
 from collections import deque
 
+import numpy as np
+
 
 class EmaIncr:
     """EMA seeded with the first value, alpha = 2/(span+1)."""
@@ -105,8 +107,12 @@ class FlowImbalanceIncr:
         self._buy.append(taker_buy_volume)
         if len(self._volume) < self._window:
             return None
-        total = sum(self._volume)
-        buy = sum(self._buy)
+        # np.sum (pairwise) matches the vectorized reference's accumulation
+        # order exactly; Python's sequential sum diverges on subnormals
+        volume_window = np.fromiter(self._volume, dtype=float)
+        buy_window = np.fromiter(self._buy, dtype=float)
+        total = float(np.sum(volume_window))
+        buy = float(np.sum(buy_window))
         if total == 0:
             return None
         return float(2 * buy / total - 1)

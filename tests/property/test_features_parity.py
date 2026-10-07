@@ -33,6 +33,10 @@ def same(a: float | None, b: float | None, scale: float = 1.0) -> bool:
     # absolute tolerance with relative tail: near-zero values (z-score around
     # 0) amplify summation-order noise, so pure relative would be meaningless
     del scale
+    import math
+
+    if math.isinf(a) or math.isinf(b):
+        return a == b  # identical infinities are equal; signs must match
     return abs(a - b) <= TOL * max(1.0, abs(a))
 
 
