@@ -82,6 +82,7 @@ class Engine:
         self._closed_bars: list[PriceBar] = []
         self._fill_events: list[FillEvent] = []
         self._equity_curve: list[tuple[int, float]] = []
+        self._bars_processed = 0
         self._seq = 0
         self._timers: set[int] = set()
         self._ledger = Ledger()
@@ -137,6 +138,7 @@ class Engine:
         ctx.now_ns = bar.ts_close_ns
         self._dispatch_fills(ctx, self.exchange.advance_to(bar.ts_close_ns))
         self._closed_bars.append(bar)
+        self._bars_processed += 1
         for evaluate in (
             self.exchange.evaluate_stop_orders,
             self.exchange.evaluate_limit_orders,
@@ -165,7 +167,7 @@ class Engine:
         if mark is None:
             mark = self.exchange.last_price or 0.0
         return EngineResult(
-            n_bars=len(self._closed_bars),
+            n_bars=self._bars_processed,
             fill_events=self._fill_events,
             equity_curve=self._equity_curve,
             final_equity=self.exchange.account.equity(mark),
@@ -183,6 +185,11 @@ class Engine:
             self._ended = True
             self.strategy.on_end(ctx)
         return self.result(mark=mark)
+
+    def restore_history(self, curve: list[tuple[int, float]], n_bars: int) -> None:
+        """Restore persisted history after a restart (paper resume)."""
+        self._equity_curve = list(curve)
+        self._bars_processed = n_bars
 
     def _on_timer_scheduled(self, ts_ns: int) -> None:
         """Callback used by the Context to register a timer in the engine heap."""

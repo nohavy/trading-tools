@@ -147,6 +147,11 @@ class BarFeed:
             self.last_delivered_close_ns = bars[-1].ts_close_ns
         return bars
 
+    def restore(self, last_close_ns: int, last_funding_ns: int) -> None:
+        """Reposition the feed after a restart (paper resume)."""
+        self.last_delivered_close_ns = last_close_ns
+        self.last_funding_ns = last_funding_ns
+
     def poll_funding(self, now_ns: int) -> list[tuple[int, float]]:
         """Return funding settlements not seen yet, strictly in ts order."""
         start_ms = max(self.last_funding_ns // 1_000_000, now_ns // 1_000_000 - 480 * MINUTE_MS)

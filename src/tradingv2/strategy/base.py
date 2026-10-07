@@ -95,3 +95,19 @@ class Strategy(ABC):
 
     def on_end(self, ctx: Context) -> None:  # noqa: B027
         """Called once after the last bar; open positions remain (valuated)."""
+
+    def export_state(self) -> dict[str, float | int | bool]:  # noqa: B027 — optional hook
+        """Internal state to persist across a paper restart (empty by default).
+
+        An empty export tells the session to infer the state from the
+        position instead (one-entry semantics).
+        """
+        return {}
+
+    def import_state(self, state: dict[str, float | int | bool]) -> None:
+        """Restore internal state after a restart; default: no state."""
+        del state
+
+    def restore_from_position(self, position: float) -> None:
+        """Fallback inference when no state was exported (default: none)."""
+        del position

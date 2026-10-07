@@ -36,6 +36,17 @@ class CashCarryLeg(Strategy):
         self._submitted = True
         self._order_id = ctx.submit_market(self._side, qty=self._qty)
 
+    def export_state(self) -> dict[str, float | int | bool]:
+        return {"submitted": self._submitted}
+
+    def import_state(self, state: dict[str, float | int | bool]) -> None:
+        self._submitted = bool(state.get("submitted", False))
+
+    def restore_from_position(self, position: float) -> None:
+        """One-entry semantics: a live position means the entry was submitted."""
+        if position != 0.0:
+            self._submitted = True
+
 
 class CashCarrySpotLeg(CashCarryLeg):
     """Long spot leg, held on the cash (quote/base) account."""
