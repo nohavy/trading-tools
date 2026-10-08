@@ -20,7 +20,13 @@
       applique le gate d'empreinte et assemble les deux jambes avec le
       sizing partagé extrait dans `research.cash_carry` (runner, bear,
       paper utilisent maintenant exactement le même calcul).
-- [ ] T009 Hour complet réel en simulé (configs paper-carry), rapport HTML
-      rendu, quality gates: suite hors net/slow, Ruff, mypy stricts verts.
+- [ ] T009 Rapport HTML rendu ✅ (`paper report`, Template Jinja,
+      `report/paper.py`); les configs paper **changent le protocole du
+      holdout** (`paper_config` lit le fichier commité — l'empreinte matche
+      par construction). ⚠️ L'« heure réelle » glisse dans T010 :
+      exécuter le paper maintenant lirait les klines d'octobre (fenêtre
+      holdout verrouillée jusqu'au verdict du 2026-11-01) — violation
+      constitutionnelle. Quality gates: 525 verts, Ruff, mypy stricts.
 - [ ] T010 (Après verdict holdout du 2026-11-01) : geler l'empreinte dans
-      `configs/paper-carry-*`, ouvrir la session paper réelle.
+      `configs/paper-carry-*`, ouvrir la session paper réelle puis lancer
+      l'heure complète simulée exigée par ce task (feed public, sans clés).
