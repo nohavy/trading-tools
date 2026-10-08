@@ -509,6 +509,22 @@ def paper_status(
     _run_or_exit(action)
 
 
+@paper_app.command("report")
+def paper_report(
+    state_dir: Annotated[Path, typer.Option(help="Session state directory")] = DATA_ROOT
+    / "paper",
+) -> None:
+    """Render the persisted paper state into paper_report.html."""
+
+    def action() -> None:
+        from tradingv2.report.paper import render_paper_state
+
+        html_path = render_paper_state(state_dir)
+        typer.echo(f"paper report: {html_path}")
+
+    _run_or_exit(action)
+
+
 def main() -> None:
     """Entry point for the tv2 script."""
     app()
