@@ -15,7 +15,11 @@
       d'empreinte (refus sans holdout franchi / `experimental: true`).
       Fix au passage: parité incrémental/vectoriel (np.sum pairwise) flaky
       préexistant; hooks d'état publics sur Strategy.
-- [ ] T008 Sous-commandes CLI `paper run --once`/`--status`/`report` + smoke.
+- [x] T008 Sous-commandes CLI `paper run --once`/`--status` + smoke
+      (523 verts, mypy strict 159 fichiers). Le runtime `build_carry_session`
+      applique le gate d'empreinte et assemble les deux jambes avec le
+      sizing partagé extrait dans `research.cash_carry` (runner, bear,
+      paper utilisent maintenant exactement le même calcul).
 - [ ] T009 Hour complet réel en simulé (configs paper-carry), rapport HTML
       rendu, quality gates: suite hors net/slow, Ruff, mypy stricts verts.
 - [ ] T010 (Après verdict holdout du 2026-11-01) : geler l'empreinte dans
