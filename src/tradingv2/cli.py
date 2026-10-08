@@ -34,6 +34,7 @@ backtest_app = typer.Typer(help="Backtest engine: run, sweep, walk-forward")
 compare_app = typer.Typer(help="Compare backtest runs")
 validate_app = typer.Typer(help="Go/no-go validation of a strategy")
 scan_app = typer.Typer(help="Asset scanner: universe, snapshot, potential ranking")
+paper_app = typer.Typer(help="Paper mode: realtime simulated execution of a validated strategy")
 
 app.add_typer(data_app, name="data")
 app.add_typer(research_app, name="research")
@@ -41,6 +42,7 @@ app.add_typer(backtest_app, name="backtest")
 app.add_typer(compare_app, name="compare")
 app.add_typer(validate_app, name="validate")
 app.add_typer(scan_app, name="scan")
+app.add_typer(paper_app, name="paper")
 
 
 def _run_or_exit(action: Callable[[], None]) -> None:
@@ -446,6 +448,65 @@ def compare_runs_cmd(
     html = compare_runs(runs, runs_root=runs_root)
     typer.echo(f"comparaison écrite: {html}")
 
+
+
+def _now_ns() -> int:
+    import datetime as dt
+
+    return int(dt.datetime.now(dt.UTC).timestamp()) * 1_000_000_000
+
+
+@paper_app.command("run")
+def paper_run(
+    config: Annotated[Path, typer.Option(help="Validated carry YAML configuration")],
+    data_root: Annotated[Path, typer.Option(help="Data root directory")] = DATA_ROOT,
+    state_dir: Annotated[Path, typer.Option(help="Session state directory")] = DATA_ROOT
+    / "paper",
+    once: Annotated[bool, typer.Option("--once", help="One poll step then stop (smoke)")] = False,
+) -> None:
+    """Start or resume the paper session (kills switch: data/paper-stop file)."""
+
+    def action() -> None:
+        import yaml
+
+        from tradingv2.paper.runtime import build_carry_session
+
+        raw = yaml.safe_load(config.read_text(encoding="utf-8"))
+        built = build_carry_session(raw, data_root=data_root, state_dir=state_dir)
+        if built.gate.experimental:
+            typer.echo("EXPERIMENTAL session: no passed holdout covers this config")
+        else:
+            typer.echo(f"gate: holdout fingerprint {built.gate.fingerprint[:16]} passed")
+        resumed = built.session.resume()
+        typer.echo(
+            f"session {'resumed' if resumed else 'started'} (hedge qty={built.hedge_qty:.8f})"
+        )
+        if once:
+            status = built.session.step(_now_ns())
+            typer.echo("halted" if status["halted"] else "stepped")
+            typer.echo(json.dumps(status["legs"], indent=2))
+            return
+        built.session.run(_now_ns, interval_s=2)
+
+    _run_or_exit(action)
+
+
+@paper_app.command("status")
+def paper_status(
+    state_dir: Annotated[Path, typer.Option(help="Session state directory")] = DATA_ROOT
+    / "paper",
+) -> None:
+    """Show the persisted paper session state."""
+
+    def action() -> None:
+        state_path = state_dir / "state.json"
+        if not state_path.is_file():
+            typer.echo("no paper session state found")
+            return
+        state = json.loads(state_path.read_text(encoding="utf-8"))
+        typer.echo(json.dumps(state["legs"], indent=2))
+
+    _run_or_exit(action)
 
 
 def main() -> None:

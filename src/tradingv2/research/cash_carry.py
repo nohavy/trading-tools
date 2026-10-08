@@ -1,8 +1,11 @@
 """Market-neutral spot long / perpetual short cash-and-carry research model."""
 
+import datetime as dt
 from dataclasses import dataclass
+from pathlib import Path
 
 import numpy as np
+import polars as pl
 
 _DAY_NS = 86_400_000_000_000
 
@@ -145,6 +148,40 @@ def _transaction_cost(
     qty: float, spot: float, perp: float, spot_cost_bps: float, perp_cost_bps: float
 ) -> float:
     return qty * spot * spot_cost_bps / 1e4 + qty * perp * perp_cost_bps / 1e4
+
+
+def daily_close_before(
+    data_root: Path, directory: Path, symbol: str, date: dt.date
+) -> float:
+    """The last daily close at or before midnight of ``date`` (runner convention)."""
+    path = directory / f"{symbol}-1d-{date.year}-{date.month:02d}.parquet"
+    bars = pl.read_parquet(path).sort("ts_open_ns")
+    boundary_ns = int(
+        dt.datetime.combine(date, dt.time(0, 0), tzinfo=dt.UTC).timestamp()
+    ) * 1_000_000_000
+    rows = bars.filter(pl.col("ts_open_ns") <= boundary_ns - 1).tail(1)
+    if rows.height != 1:
+        raise FileNotFoundError(f"no daily bar before {date} for {symbol} under {directory}")
+    return float(rows["close"][0])
+
+
+def carry_qty(data_root: Path, config: dict[str, object]) -> float:
+    """Shared sizing: runner, bear replication and paper use the exact same rule."""
+    symbol = str(config["symbol"])
+    qty_date = dt.date.fromisoformat(str(config.get("qty_date", "2023-06-30")))
+    spot = daily_close_before(
+        data_root,
+        data_root / "parquet" / "spot" / "klines" / symbol / "1d",
+        symbol,
+        qty_date,
+    )
+    perp = daily_close_before(data_root, data_root / "daily" / "um" / symbol, symbol, qty_date)
+    return hedge_qty(
+        spot,
+        perp,
+        float(str(config["total_capital"])),
+        float(str(config["hedge_fraction"])),
+    )
 
 
 def hedge_qty(

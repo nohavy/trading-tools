@@ -26,6 +26,11 @@ class CashCarryLeg(Strategy):
         self._submitted = False
         self._order_id: int | None = None
 
+    @property
+    def qty(self) -> float:
+        """The configured hedge quantity (identical across the two legs)."""
+        return self._qty
+
     def on_bar(self, ctx: Context, bar: PriceBar) -> None:
         if self._submitted:
             return
