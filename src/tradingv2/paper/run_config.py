@@ -15,4 +15,5 @@ def paper_config(symbol_stem: str) -> dict[str, Any]:
     committed file as the holdout guarantees the fingerprint match.
     """
     path = _CONFIGS / f"research-carry-holdout-2026-10-{symbol_stem.strip().lower()}.yaml"
-    return yaml.safe_load(path.read_text(encoding="utf-8"))
+    config: dict[str, Any] = yaml.safe_load(path.read_text(encoding="utf-8"))
+    return config

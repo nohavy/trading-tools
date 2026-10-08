@@ -7,6 +7,7 @@ import pytest
 from tradingv2.backtest.engine import Engine
 from tradingv2.config import Market
 from tradingv2.core.types import PriceBar
+from tradingv2.execution.exchange import SimulatedExchange
 from tradingv2.paper.run_config import paper_config
 from tradingv2.paper.session import PaperLeg, PaperSession
 from tradingv2.report.paper import render_paper_state
@@ -33,7 +34,7 @@ class StaticFeed:
         self.cursor = sum(1 for b in self._bars if b.ts_close_ns <= last_close_ns)
 
 
-def _exchange_for(leg: str):
+def _exchange_for(leg: str) -> SimulatedExchange:
     from tradingv2.costs.fees import FeeSchedule
     from tradingv2.costs.latency import LatencyModel
     from tradingv2.costs.slippage import SlippageModel
