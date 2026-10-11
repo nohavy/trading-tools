@@ -31,7 +31,7 @@ def bigquery_runner(dataset: str) -> Callable[[str], pl.DataFrame]:
     def run(sql: str) -> pl.DataFrame:
         result = client.query(sql).result()
         arrow = result.to_arrow(create_bqstorage_client=False)
-        return pl.from_arrow(arrow)  # type: ignore[arg-type, return-value]
+        return pl.from_arrow(arrow)
 
     return run
 
