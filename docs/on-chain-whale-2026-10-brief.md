@@ -5,6 +5,28 @@ données on-chain** — transposition du ch11 (scorecards) d'*Investing for
 Programmers*. Ce document fige l'hypothèse d'un éventuel feature 012 ; il
 ne vaut autorisation d'aucune sorte.
 
+## Verdict empirique de l'heuristique (2020-01, BigQuery réel)
+
+La sonde topologique janvier 2020 (in-degree × out-degree sur les
+transferts natifs ETH, 2 356 283 adresses actives) classe **#1 le
+cluster Binance actif** `0x3f5ce5fbfe3e9af3971dd873d819547554bea7e3`
+(in=35 414, out=13 313, 4,6 M ETH transacted) — référence publique du
+hot wallet Binance documentée. Le wallet `0xF977…1aceC` était dormant ce
+mois-là (in=0) : la topologie capture ce qui EST un exchange, pas une
+étiquette héritée.
+
+**Amendement figé pré-résultats** (remplace la formulation « whale ≥ 0,1 %
+supply », impossible sur le modèle UTXO/account sans snapshots) :
+1. Hub discovery = fenêtre **2020-01** uniquement (avant les fenêtres
+   d'évaluation), heuristique topologie pure.
+2. Seuils gelés : in-degree ≥ 5 000, out-degree ≥ 100, volume ≥ 1 000 ETH,
+   top 30 par score (in×out).
+3. Le set figé est écrit dans `data/onchain/eth_hubs_2020-01.json`
+   (provenance: job BigQuery id, sha256, fenêtre, SQL) ; tout usage
+   ultérieur consomme ce set et jamais une redécouverte.
+4. Signal = flux net journalier de ce set (deposits − withdrawals,
+   adresses figées), agrégé 7 jours au screen.
+
 ## Hypothèse (formulation figée)
 
 Les transferts on-chain observables télégraphient les intentions des gros
