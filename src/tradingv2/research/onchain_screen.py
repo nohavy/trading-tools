@@ -54,6 +54,10 @@ def screen_net_flows(
     held = False
     for t in range(n_days):
         lo = max(0, t - lookback_days + 1)
+        # FULL window only: partial coverage invalidates the frozen signal
+        if t - lo < lookback_days - 1:
+            positions[t] = 0.0
+            continue
         net = float(dep[lo:t + 1].sum() - wit[lo:t + 1].sum())
         flows_net[t] = net
         if held and abs(net) <= flat_exit:
@@ -80,3 +84,22 @@ def screen_net_flows(
         fees_bcps=fees,
         flows_net=flows_net,
     )
+
+
+def calibrate_entry_net(
+    net_flows: np.ndarray, is_mask: np.ndarray, *, quantile: float
+) -> tuple[float, float]:
+    """Frozen calibration from the IS window's flows only (never returns).
+
+    Entry = the ``quantile`` of the positive net-inflow days; exit = the
+    25th percentile of the same series (the brief's default).
+    """
+    visible_all = np.asarray(net_flows, dtype=float)
+    is_mask_np = np.asarray(is_mask, dtype=bool)
+    if is_mask_np.size != visible_all.size:
+        raise ValueError("is_mask must cover the same days as net_flows")
+    visible = visible_all[is_mask_np]
+    positives = visible[visible > 0.0]
+    if positives.size < 10:
+        raise ValueError("the IS window must contain at least 10 positive net-inflow days")
+    return float(np.quantile(positives, quantile)), float(np.quantile(positives, 0.25))
