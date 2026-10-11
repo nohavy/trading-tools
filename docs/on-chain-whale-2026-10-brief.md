@@ -27,6 +27,12 @@ supply », impossible sur le modèle UTXO/account sans snapshots) :
    **Empreinte** : sha256 = f2c7f06b8c81849d (fichier local, ignoré par
    git, 20 hubs retenus — le hub Binance actif #1 et le portefeuille
    identitaire de CZ 0x5f54… y figurent).
+4. **Seuil d'entrée (calibration figée)** : le quantile 90 % des flux nets
+   positifs journaliers (*déposit − withdraw*) de la fenêtre **IS
+   2021-01-01 → 2023-06-30 uniquement des flux, jamais de rendements**.
+   La sortie : flux net redevenu < quantile 25 % sur la même fenêtre.
+   Fenêtre glissante 7 jours à couverture COMPLÈTE obligatoire avant le
+   premier jour candidat (chaude fraîche = flat).
 4. Signal = flux net journalier de ce set (deposits − withdrawals,
    adresses figées), agrégé 7 jours au screen.
 
