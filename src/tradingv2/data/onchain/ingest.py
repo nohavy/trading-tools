@@ -31,7 +31,10 @@ def bigquery_runner(dataset: str) -> Callable[[str], pl.DataFrame]:
     def run(sql: str) -> pl.DataFrame:
         result = client.query(sql).result()
         arrow = result.to_arrow(create_bqstorage_client=False)
-        return pl.from_arrow(arrow)
+        frame = pl.from_arrow(arrow)
+        if not isinstance(frame, pl.DataFrame):
+            raise ValueError("unexpected BigQuery arrow payload (not a table)")
+        return frame
 
     return run
 
