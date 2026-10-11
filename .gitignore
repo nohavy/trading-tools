@@ -1,5 +1,5 @@
-data/
-runs/
+/data/
+/runs/
 .env
 .env.*
 .hypothesis/
@@ -14,4 +14,4 @@ __pycache__/
 htmlcov/
 dist/
 *.egg-info/
-.DS_Store
+.DS_Storedata/gcp_key.json
