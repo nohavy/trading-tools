@@ -4,6 +4,7 @@ import numpy as np
 import pytest
 
 from tradingv2.research.cash_carry import (
+    carry_tail_scenarios,
     combine_leg_equities,
     hedge_qty,
     simulate_cash_and_carry,
@@ -113,3 +114,35 @@ def test_combine_leg_equities_sums_aligned_daily_marks() -> None:
             ts, np.array([10_000.0, 11_000.0]),
             np.array([1, 2], dtype=np.int64), np.array([10_000.0, 10_500.0]),
         )
+
+
+def test_tail_scenarios_constant_return_is_deterministic() -> None:
+    """A stable carry on a 10-day block bootstrap: every path is identical."""
+    returns = np.full(60, 0.001)
+    out = carry_tail_scenarios(returns, sims=50, horizon_days=30, seed=42)
+    constant_total = float(1.001**30 - 1)
+    for key in ("p05", "p25", "median", "p75", "p95"):
+        assert out[key] == pytest.approx(constant_total, abs=1e-9)
+    assert out["prob_final_negative"] == pytest.approx(0.0)
+    assert out["prob_dd_over_2pct"] == pytest.approx(0.0)
+
+
+def test_tail_scenarios_repeats_seed_and_loses_with_negative_days() -> None:
+    rng = np.random.default_rng(7)
+    returns = rng.normal(loc=-0.0002, scale=0.004, size=400)
+    a = carry_tail_scenarios(returns, sims=200, horizon_days=90, seed=3)
+    b = carry_tail_scenarios(returns, sims=200, horizon_days=90, seed=3)
+    assert a == b
+    out = carry_tail_scenarios(returns, sims=500, horizon_days=90, seed=5)
+    assert out["prob_final_negative"] > 0.5  # negative drift widens the loss tail
+    assert 0.0 <= out["prob_dd_over_5pct"] <= 1.0
+    assert out["p05"] < out["median"] < out["p95"]
+
+
+def test_tail_scenarios_rejects_bad_inputs() -> None:
+    with pytest.raises(ValueError, match="sims"):
+        carry_tail_scenarios(np.zeros(10), sims=0, horizon_days=30, seed=1)
+    with pytest.raises(ValueError, match="horizon"):
+        carry_tail_scenarios(np.zeros(10), sims=10, horizon_days=0, seed=1)
+    with pytest.raises(ValueError, match="at least one block"):
+        carry_tail_scenarios(np.zeros(10), sims=10, horizon_days=30, seed=1)

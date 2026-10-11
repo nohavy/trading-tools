@@ -2,7 +2,7 @@
 
 import pytest
 
-from tradingv2.data.onchain.sqls import eth_hub_degree_sql, flow_daily_sql
+from tradingv2.data.onchain.sqls import eth_flow_daily_sql, eth_hub_degree_sql
 
 
 def test_eth_hub_degree_sql_filters_by_window_and_is_deterministic() -> None:
@@ -22,12 +22,11 @@ def test_eth_hub_degree_sql_rejects_inverted_window() -> None:
         eth_hub_degree_sql(start="2020-02-01", end="2020-01-01")
 
 
-def test_flow_daily_sql_inlines_frozen_addresses_sorted() -> None:
-    sqls = flow_daily_sql(
+def test_eth_flow_daily_inlines_frozen_addresses_sorted() -> None:
+    sqls = eth_flow_daily_sql(
         addresses=("0xbbb", "0xaaa"),
         start="2021-01-01",
         end="2021-12-31",
-        dataset="crypto_ethereum",
     )
     assert sqls["eth_flows"] == sqls["eth_flows"]  # deterministic
     assert "'0xaaa', '0xbbb'" in sqls["eth_flows"]  # sorted literals

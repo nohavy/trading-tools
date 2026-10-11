@@ -217,6 +217,60 @@ def combine_leg_equities(
     return spot_ts, spot_eq + perp_eq
 
 
+def carry_tail_scenarios(
+    net_returns: np.ndarray,
+    *,
+    sims: int,
+    horizon_days: int,
+    seed: int,
+    block_days: int = 20,
+) -> dict[str, float]:
+    """Circular block bootstrap of daily returns: terminal PnL and drawdown tails.
+
+    Blocks of ``block_days`` consecutive days (matching the Newey-West lag
+    discipline) preserve serial correlation; i.i.d. single-day resampling
+    would understate the drawdown tail.
+    """
+    if sims <= 0:
+        raise ValueError("sims must be positive")
+    if horizon_days <= 0:
+        raise ValueError("horizon_days must be positive")
+    returns = np.asarray(net_returns, dtype=float)
+    n = returns.size
+    if n < block_days:
+        raise ValueError("return series must cover at least one block")
+    n_blocks = (horizon_days + block_days - 1) // block_days
+    if n_blocks < 1:
+        raise ValueError("at least one block must fit in the horizon")
+    rng = np.random.default_rng(seed)
+    max_start = n - block_days
+    finals = np.empty(sims)
+    dds = np.empty(sims)
+    for s in range(sims):
+        starts = rng.integers(0, max_start + 1, size=n_blocks)
+        chunks = [
+            returns[start:start + block_days][: horizon_days - b * block_days]
+            for b, start in enumerate(starts)
+        ]
+        path_returns = np.concatenate(chunks)
+        equity = np.cumprod(1.0 + path_returns)
+        finals[s] = equity[-1] - 1.0
+        path = np.r_[1.0, equity]
+        peaks = np.maximum.accumulate(path)
+        dds[s] = float(np.max(1.0 - path / peaks))
+    p05, p25, p50, p75, p95 = np.percentile(finals, [5, 25, 50, 75, 95])
+    return {
+        "p05": float(p05),
+        "p25": float(p25),
+        "median": float(p50),
+        "p75": float(p75),
+        "p95": float(p95),
+        "prob_final_negative": float(np.mean(finals < 0.0)),
+        "prob_dd_over_2pct": float(np.mean(dds > 0.02)),
+        "prob_dd_over_5pct": float(np.mean(dds > 0.05)),
+    }
+
+
 def _sum_between(
     timestamps: np.ndarray, rates: np.ndarray, start_exclusive: int, end_inclusive: int
 ) -> float:
