@@ -24,6 +24,9 @@ supply », impossible sur le modèle UTXO/account sans snapshots) :
 3. Le set figé est écrit dans `data/onchain/eth_hubs_2020-01.json`
    (provenance: job BigQuery id, sha256, fenêtre, SQL) ; tout usage
    ultérieur consomme ce set et jamais une redécouverte.
+   **Empreinte** : sha256 = f2c7f06b8c81849d (fichier local, ignoré par
+   git, 20 hubs retenus — le hub Binance actif #1 et le portefeuille
+   identitaire de CZ 0x5f54… y figurent).
 4. Signal = flux net journalier de ce set (deposits − withdrawals,
    adresses figées), agrégé 7 jours au screen.
 

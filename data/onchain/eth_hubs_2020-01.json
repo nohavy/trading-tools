@@ -1,0 +1,157 @@
+{
+ "discovery_window": {
+  "start": "2020-01-01",
+  "end": "2020-02-01"
+ },
+ "floors": {
+  "in_deg": 5000,
+  "out_deg": 100,
+  "vol_eth": 1000.0
+ },
+ "top_k": 30,
+ "source_table": "bigquery-public-data.crypto_ethereum.transactions",
+ "sql_heading": "topology-only in/out degree union aggregation",
+ "gcp_project": "tradingv2-onchain",
+ "hubs": [
+  {
+   "address": "0x3f5ce5fbfe3e9af3971dd833d26ba9b5c936f0be",
+   "in_deg": 35414.0,
+   "out_deg": 13313.0,
+   "vol_eth": 4623747.48,
+   "score": 471466582.0
+  },
+  {
+   "address": "0xc88f7666330b4b511358b7742dc2a3234710e7b1",
+   "in_deg": 10214.0,
+   "out_deg": 9297.0,
+   "vol_eth": 16454.78,
+   "score": 94959558.0
+  },
+  {
+   "address": "0x5f5424cc4e19ef4dffea672173ad15fda29c55cc",
+   "in_deg": 9524.0,
+   "out_deg": 8881.0,
+   "vol_eth": 1036.89,
+   "score": 84582644.0
+  },
+  {
+   "address": "0xcfcf469b76113c5e7218f8275eaf10a881ac106d",
+   "in_deg": 5594.0,
+   "out_deg": 12008.0,
+   "vol_eth": 90114.01,
+   "score": 67172752.0
+  },
+  {
+   "address": "0x4fed1fc4144c223ae3c1553be203cdfcbd38c581",
+   "in_deg": 7158.0,
+   "out_deg": 3829.0,
+   "vol_eth": 19548.61,
+   "score": 27407982.0
+  },
+  {
+   "address": "0xe711caa45d71d04d5528b41029247e09d1235980",
+   "in_deg": 21909.0,
+   "out_deg": 1183.0,
+   "vol_eth": 15612.49,
+   "score": 25918347.0
+  },
+  {
+   "address": "0xd1692faec668151537b3e10653177f50d6cdb6a9",
+   "in_deg": 21309.0,
+   "out_deg": 1191.0,
+   "vol_eth": 10909.95,
+   "score": 25379019.0
+  },
+  {
+   "address": "0xa7efae728d2936e78bda97dc267687568dd593f3",
+   "in_deg": 5295.0,
+   "out_deg": 4350.0,
+   "vol_eth": 2447849.07,
+   "score": 23033250.0
+  },
+  {
+   "address": "0x2819c144d5946404c0516b6f817a960db37d4929",
+   "in_deg": 5194.0,
+   "out_deg": 4370.0,
+   "vol_eth": 92051.75,
+   "score": 22697780.0
+  },
+  {
+   "address": "0x1e281846fdaa56819d7ff0203bfdee6c2ef75fa9",
+   "in_deg": 18198.0,
+   "out_deg": 1085.0,
+   "vol_eth": 10921.58,
+   "score": 19744830.0
+  },
+  {
+   "address": "0xafbc6e341c1632c8cf481db57d1a1b053e49d502",
+   "in_deg": 19262.0,
+   "out_deg": 995.0,
+   "vol_eth": 12166.12,
+   "score": 19165690.0
+  },
+  {
+   "address": "0x79b9e96f9c87ac3499ab5eb4e13c444455529a9a",
+   "in_deg": 18357.0,
+   "out_deg": 1017.0,
+   "vol_eth": 10776.06,
+   "score": 18669069.0
+  },
+  {
+   "address": "0xa2f6090c0483d6e6ac90a9c23d42e461fee2ac51",
+   "in_deg": 17432.0,
+   "out_deg": 1021.0,
+   "vol_eth": 14547.35,
+   "score": 17798072.0
+  },
+  {
+   "address": "0x6b591b35532e26d9da258d526961cb0887cafc9a",
+   "in_deg": 16280.0,
+   "out_deg": 1017.0,
+   "vol_eth": 12462.42,
+   "score": 16556760.0
+  },
+  {
+   "address": "0x842999ef8d7c4d29e78535ec97e11f99b9e32fab",
+   "in_deg": 13757.0,
+   "out_deg": 1035.0,
+   "vol_eth": 2605.57,
+   "score": 14238495.0
+  },
+  {
+   "address": "0x1953fe2eae011d9a25ca90a0d76655150b010fa2",
+   "in_deg": 16351.0,
+   "out_deg": 862.0,
+   "vol_eth": 9790.93,
+   "score": 14094562.0
+  },
+  {
+   "address": "0xa090e606e30bd747d4e6245a1517ebe430f0057e",
+   "in_deg": 15652.0,
+   "out_deg": 829.0,
+   "vol_eth": 11279.27,
+   "score": 12975508.0
+  },
+  {
+   "address": "0x9cf674f00b6bf61012393174913b7818cd2fc508",
+   "in_deg": 15025.0,
+   "out_deg": 858.0,
+   "vol_eth": 10952.55,
+   "score": 12891450.0
+  },
+  {
+   "address": "0xef67a8843dce876a5b8df7080d617cc314c06ad5",
+   "in_deg": 7024.0,
+   "out_deg": 1806.0,
+   "vol_eth": 77630.18,
+   "score": 12685344.0
+  },
+  {
+   "address": "0xdf64dc798ddf3aab365507ec31a63f411a8c70c7",
+   "in_deg": 5262.0,
+   "out_deg": 1128.0,
+   "vol_eth": 12365.02,
+   "score": 5935536.0
+  }
+ ]
+}
