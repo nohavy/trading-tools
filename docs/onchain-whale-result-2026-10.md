@@ -36,17 +36,18 @@ retirées), closes spot ETH 1d.
 Le flux net de dépôts sur les hubs, détecté topologiquement, est une
 accumulation de pouvoir d'achat plutôt qu'un signal de vente : les afflux
 coïncident avec les phases haussières au lieu de les précéder. La
-sémantique d'alerte du livre (entrées sur exchange = vente) ne transpose
-pas à ce niveau topologique un sujet de twenty hubs dérivés par flux de
-gang de clients dispersés.
+sémantique d'alerte du livre (« entrées sur exchange = préparation de
+vente ») ne transpose pas à ce niveau topologique — les hubs ingèrent les
+flux d'un grand nombre de clients dispersés en continu, le signal brut
+n'identifie pas la direction de la position finale des whales.
 
 ## L'héritage durable de la feature 012
 
 La pipeline d'ingestion BigQuery (gate de faisabilité gratuit, SQL
-déterministe, parquet listés + manifest listés sha256) est réutilisable tel
-quel pour toute future hypothèse on-chain. Le coûts de scan gratuits et la
-couverture 2019+ font que le prochain écran peut être testé en quelques
-heures plutôt qu'en quelques semaines.
+déterministe, parquet checksummé désormais validé de bout en bout à
+l'échelle 2019+) reste réutilisable telle quelle pour toute future
+hypothèse on-chain. Un prochain écran peut tourner en quelques heures
+plutôt qu'en quelques semaines.
 
 Artefacts : `data/onchain/eth_hubs_2020-01.json` et
 `data/onchain/eth_flows_2021-01-01_2026-08-31.parquet` + manifest sha256
