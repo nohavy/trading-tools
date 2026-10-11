@@ -3,6 +3,7 @@ runs/
 .env
 .env.*
 .hypothesis/
+docs/*.pdf
 __pycache__/
 *.pyc
 .venv/
