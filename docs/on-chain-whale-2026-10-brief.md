@@ -26,16 +26,25 @@ Combinable uniquement avec les deux signaux déjà validés du projet
   features porteuses 009/010.
 - Aucun recalibrage après lecture du résultat.
 
-## Contraintes de données — gate de faisabilité non résolue
+## Contraintes de données — gate de faisabilité clôturée (2026-10-11)
 
-Avant toute expérimentation, établir :
-1. une **source publique déterministe et rejouable** (candidats à évaluer :
-   Blockchair, Etherscan v2, DefiLlama ; Glassnode et Dune sont payants) —
-   l'ingestion doit supporter checksum et rejeu ;
-2. la **couverture 2019+** pour BTC et ETH, idéalement les actifs UM du
-   scan pour croiser avec le basis ;
-3. la **stabilité de l'offre** : une API qui dégrade son offre casse le
-   rejeu constitutionnel.
+Sondes réseau exécutées le 2026-10-11 :
+
+1. **Blockchair** : stats sans clé OK ; dashboards par adresse → HTTP 430
+   (blacklist temporaire immédiate sans clé) — flux whale = offre payante.
+2. **Etherscan V2** : clé obligatoire sur toute requête ; le free tier
+   (5 req/s) ne peut ni classer l'ensemble des holders ni balayer les
+   adresses d'exchange depuis 2019 à coût deterministe raisonnable.
+3. **DefiLlama** : gratuit, mais couvre TVL/protocoles — pas de flux whale
+   par adresse.
+
+**Uniquement motrice restante** : BigQuery public datasets (blockchain
+BTC/ETH indexées, SQL déterministe rejouable, gratuit jusqu'à ~1 To/mois
+de requêtes). Prérequis : un compte GCP utilisateur + une ingestion
+grand-teint (catalogue checksummé). Si le compte n'est pas ouvert :
+hypothèse close (NO-GO technique documenté) — pas de tiraillement.
+
+**Décision requise de l'utilisateur avant la suite de la feature 012.**
 
 Si aucune source gratuite stable n'existe : close proprement (NO-GO
 technique documenté).
