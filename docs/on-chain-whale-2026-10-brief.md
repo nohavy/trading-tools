@@ -38,16 +38,18 @@ Sondes réseau exécutées le 2026-10-11 :
 3. **DefiLlama** : gratuit, mais couvre TVL/protocoles — pas de flux whale
    par adresse.
 
-**Uniquement motrice restante** : BigQuery public datasets (blockchain
-BTC/ETH indexées, SQL déterministe rejouable, gratuit jusqu'à ~1 To/mois
-de requêtes). Prérequis : un compte GCP utilisateur + une ingestion
-grand-teint (catalogue checksummé). Si le compte n'est pas ouvert :
-hypothèse close (NO-GO technique documenté) — pas de tiraillement.
+**Verdict (2026-10-11) : PASSED.** Les requêtes réelles sur
+`bigquery-public-data.crypto_bitcoin` sont **facturées 0 octet** — un scan
+complet de `outputs` (3,96 milliards de lignes) a tourné avec
+`total_bytes_billed = 0` sur un compte sandbox **sans billing**. Les bases
+sondes confirment des données vivantes : blocks = 970 939 lignes (09/10),
+outputs d'un bloc = 6 156 lignes, transactions ETH ≈ 200 k / 1 000 blocs.
+Le sandbox sans carte suffit ; les sources payantes ne sont pas nécessaires.
 
-**Décision requise de l'utilisateur avant la suite de la feature 012.**
-
-Si aucune source gratuite stable n'existe : close proprement (NO-GO
-technique documenté).
+La couverture est complète : `inputs`/`outputs` (BTC UTXO, adresses
+dépaquetées par UNNEST), `transactions`/`token_transfers`/`traces` (ETH).
+Les metadata (num_rows/bytes et dry-run) mentent (0 partout) — seuls les
+comptes réels font foi ; les requêtes pleines restent sans coût.
 
 ## Ordre de falsification (identique aux features précédentes)
 
