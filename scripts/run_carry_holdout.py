@@ -96,6 +96,10 @@ def main() -> None:
         print(f"running {stem} holdout legs...", flush=True)
         result = run_symbol_cfg(cfg, data_root=args.data_root, runs_root=args.runs_root)
         verdict = _frozen_verdict(result)
+        from tradingv2.paper.gate import frozen_fingerprint
+
+        verdict["fingerprint"] = frozen_fingerprint(cfg)
+        verdict["passed"] = verdict["survived_the_month"]
         results.append({**result, "frozen_checklist": verdict})
         verdicts.append(verdict["survived_the_month"])
         print(

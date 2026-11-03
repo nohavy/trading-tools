@@ -75,7 +75,6 @@ def run_screen(
     is_from, is_to = "2021-01-01", "2023-06-30"
     is_mask = np.array([(is_from <= d <= is_to) for d in days])
     oos_from, oos_to = "2023-07-01", "2026-08-31"
-    oos_mask = np.array([(oos_from <= d <= oos_to) for d in days])
     entry, flat_exit = calibrate_entry_net(net_flows[7:], is_mask[7:], quantile=0.90)
 
     screen = screen_net_flows(
