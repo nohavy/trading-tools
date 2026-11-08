@@ -13,6 +13,30 @@ Le mécanisme reste positif et solvable à F ∈ {2 ; 3,5 ; 5}. Le F retenu
 est le plus haut qui franchit tous les échelons. Si aucun F ne passe, le
 levier est falsifié et le socle 1× reste le portefeuille.
 
+## Amendement mécanique figé (pré-exécution, le 2026-11-08)
+
+- **F > 1 exige un emprunt spot** : la jambe spot passe sur un compte
+  marge spot (nouveau type `margin_spot` dans le moteur) — l'achat est
+  payé du cash d'abord, le reste est emprunté ; les intérêts s'ajoutent
+  à la dette, proportionnellement au temps ; une vente rembourse la
+  dette d'abord.
+- **APR figé : 6 %/an flat**, les deux fenêtres, les deux symboles.
+  Une sensibilité {2 % ; 6 % ; 12 %} est publiée en secondaire ; le
+  verdict utilise 6 %. Plate et prudence : l'APR réel de Binance varie
+  (pointes hautes en 2021 et fin 2024) — un GO à 6 % flat reste un GO
+  prudent, pas une promesse.
+- **Solvabilité évaluée sur la vue jointe (portfolio margin)** : le
+  spot long sert de collatéral au short perp — ratio = equity combinée
+  / (exigence de maintenance sur le short) ≥ 2× à chaque marque daily,
+  et aucune liquidation jointe. Les equity MINIMES PAR COMPTE sont
+  rapportées comme besoin de transferts opérationnels (le modèle deux
+  comptes du moteur sépare les marges ; il ne change pas le PnL
+  combiné).
+- **Mécanique d'intérêts** : accrual depuis le bar de l'engine
+  (`accrue_to`), elle apparaît naturellement dans les marques d'equity ;
+  le ratio de marge joint est recalculé à post-lecture (equity combinée
+  aux closes daily + closes perp 1d).
+
 ## Ordre de lecture pré-déclaré (le verdict suit le plus strict échelon)
 
 1. **Solvabilité d'abord** : un ratio de marge (equity / exigence de
