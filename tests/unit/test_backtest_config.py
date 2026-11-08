@@ -86,3 +86,21 @@ def test_unknown_account_type_rejected(tmp_path: Path) -> None:
 def test_missing_file_raises(tmp_path: Path) -> None:
     with pytest.raises(Exception, match="not found"):
         load_backtest_config(tmp_path / "nope.yaml")
+
+
+def test_margin_spot_account_accepted(tmp_path: Path) -> None:
+    content = VALID.replace("type: margin", "type: margin_spot")
+    content = content.replace(
+        "leverage: 5", "leverage: 1\n  mmr: 0.05\n  borrow_apr_pct: 6"
+    )
+    cfg = load_backtest_config(write(tmp_path, content))
+    assert cfg.account.type == "margin_spot"
+    assert cfg.account.mmr == pytest.approx(0.05)
+    assert cfg.account.borrow_apr_pct == pytest.approx(6.0)
+
+
+def test_borrow_apr_out_of_range_rejected(tmp_path: Path) -> None:
+    content = VALID.replace("type: margin", "type: margin_spot")
+    content = content.replace("leverage: 5", "leverage: 1\n  borrow_apr_pct: 150")
+    with pytest.raises(Exception, match="borrow_apr_pct"):
+        load_backtest_config(write(tmp_path, content))

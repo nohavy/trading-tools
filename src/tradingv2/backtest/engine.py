@@ -11,12 +11,20 @@ ledger (invariant: net = gross - fees - slippage - funding).
 
 import heapq
 from dataclasses import dataclass, field
+from typing import Protocol, runtime_checkable
 
 from tradingv2.core.types import FundingEvent, Order, PriceBar
 from tradingv2.execution.exchange import FillEvent, SimulatedExchange
 from tradingv2.portfolio.ledger import Ledger, LedgerTotals
 from tradingv2.portfolio.margin import MarginAccount
 from tradingv2.strategy.base import Context, Strategy
+
+
+@runtime_checkable
+class _InterestBearer(Protocol):
+    """Structural hook: accounts that carry borrow interest (brief 014)."""
+
+    def accrue_to(self, ts_ns: int) -> float: ...
 
 
 @dataclass(frozen=True)
@@ -136,6 +144,9 @@ class Engine:
         exits between phases.
         """
         ctx.now_ns = bar.ts_close_ns
+        # borrow interest accrues on the debt standing since the last close
+        if isinstance(self.exchange.account, _InterestBearer):
+            self.exchange.account.accrue_to(bar.ts_close_ns)
         self._dispatch_fills(ctx, self.exchange.advance_to(bar.ts_close_ns))
         self._closed_bars.append(bar)
         self._bars_processed += 1

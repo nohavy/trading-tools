@@ -15,6 +15,7 @@ class AccountType:
 
     SPOT = "spot"
     MARGIN = "margin"
+    MARGIN_SPOT = "margin_spot"
 
 
 class AccountSpec(BaseModel):
@@ -22,10 +23,11 @@ class AccountSpec(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    type: str = Field(pattern="^(spot|margin)$")
+    type: str = Field(pattern="^(spot|margin|margin_spot)$")
     balance: float = Field(gt=0)
     leverage: int = Field(default=1, ge=1, le=20)
     mmr: float = Field(default=0.004, gt=0, lt=0.1)
+    borrow_apr_pct: float | None = Field(default=None, ge=0, lt=100)
 
 
 class LatencySpec(BaseModel):

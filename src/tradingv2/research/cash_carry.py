@@ -258,8 +258,9 @@ def carry_tail_scenarios(
         path = np.r_[1.0, equity]
         peaks = np.maximum.accumulate(path)
         dds[s] = float(np.max(1.0 - path / peaks))
-    p05, p25, p50, p75, p95 = np.percentile(finals, [5, 25, 50, 75, 95])
+    p01, p05, p25, p50, p75, p95 = np.percentile(finals, [1, 5, 25, 50, 75, 95])
     return {
+        "p01": float(p01),
         "p05": float(p05),
         "p25": float(p25),
         "median": float(p50),

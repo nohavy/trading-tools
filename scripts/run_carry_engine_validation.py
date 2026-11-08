@@ -19,7 +19,12 @@ import polars as pl
 import yaml
 
 from tradingv2.backtest.runner import run_backtest
-from tradingv2.research.cash_carry import combine_leg_equities, hedge_qty
+from tradingv2.research.carry_leverage import check_factor, derive_legs_cfg, scaled_qty
+from tradingv2.research.cash_carry import (
+    carry_tail_scenarios,
+    combine_leg_equities,
+    hedge_qty,
+)
 from tradingv2.research.time_series_trend import summarize_daily_equity_curve
 
 SYMBOLS = ("BTCUSDT", "ETHUSDT")
@@ -159,22 +164,45 @@ def _summarize(
     return oos
 
 
-def run_symbol_cfg(cfg: dict[str, Any], *, data_root: Path, runs_root: Path) -> dict[str, Any]:
+def run_symbol_cfg(
+    cfg: dict[str, Any],
+    *,
+    data_root: Path,
+    runs_root: Path,
+    sizing_factor: float = 1.0,
+) -> dict[str, Any]:
     symbol = str(cfg["symbol"])
+    check_factor(sizing_factor)
     oos_start_ns = int(cfg.get("oos_start_ns", _ns(OOS_START)))
     oos_end_ns = int(cfg.get("oos_end_ns", _ns(OOS_END)))
     end_inclusive = bool(cfg.get("oos_end_inclusive", False))
     subperiods = bool(cfg.get("oos_subperiods", True))
-    qty = _hedge_qty_for(data_root, symbol, cfg)
+    qty = scaled_qty(_hedge_qty_for(data_root, symbol, cfg), sizing_factor)
     trade_start_ns = int(cfg["trade_start_ns"])
-
+    hedge_fraction = float(cfg["hedge_fraction"])
+    if sizing_factor > 1.0:
+        leg_cfgs = derive_legs_cfg(
+            cfg["legs"],
+            factor=sizing_factor,
+            hedge_fraction=hedge_fraction,
+            spot_margin_mmr=float(cfg["spot_margin_mmr"]),
+            borrow_apr_pct=float(cfg["borrow_apr_pct"]),
+        )
+    else:
+        leg_cfgs = derive_legs_cfg(
+            cfg["legs"],
+            factor=1.0,
+            hedge_fraction=hedge_fraction,
+            spot_margin_mmr=0.05,
+            borrow_apr_pct=6.0,
+        )
     legs: dict[str, dict[str, Any]] = {}
     curves: list[tuple[np.ndarray, np.ndarray]] = []
     fill_qtys: list[float] = []
     for leg_name in ("spot", "perp"):
         print(f"running {symbol} {leg_name} leg on 1m bars (qty={qty:.8f})...", flush=True)
         run_dir = _run_leg(
-            symbol, leg_name, cfg["legs"][leg_name], qty, trade_start_ns,
+            symbol, leg_name, leg_cfgs[leg_name], qty, trade_start_ns,
             data_root=data_root, runs_root=runs_root,
         )
         stats = _leg_stats(run_dir)
@@ -196,20 +224,33 @@ def run_symbol_cfg(cfg: dict[str, Any], *, data_root: Path, runs_root: Path) -> 
         raise RuntimeError(f"{symbol}: legs coverage ratio {coverage:.4f} < {COVERAGE_RATIO_MIN}")
 
     ts, combined = combine_leg_equities(*curves[0], *curves[1])
+    daily_returns = combined[1:] / combined[:-1] - 1.0
     return {
         "symbol": symbol,
+        "sizing_factor": sizing_factor,
         "hedge_qty": qty,
         "coverage_ratio": coverage,
         "legs": legs,
         "oos": _summarize(ts, combined, oos_start_ns, oos_end_ns, subperiods=subperiods),
+        "tail": carry_tail_scenarios(
+            daily_returns, sims=1000, horizon_days=365, seed=42
+        ),
         "combined_equity_end_usdt": float(combined[-1]),
         "combined_equity_start_usdt": float(combined[0]),
     }
 
 
-def run_symbol(data_root: Path, runs_root: Path, config_path: Path) -> dict[str, Any]:
+def run_symbol(
+    data_root: Path,
+    runs_root: Path,
+    config_path: Path,
+    *,
+    sizing_factor: float = 1.0,
+) -> dict[str, Any]:
     cfg = yaml.safe_load(config_path.read_text(encoding="utf-8"))
-    return run_symbol_cfg(cfg, data_root=data_root, runs_root=runs_root)
+    return run_symbol_cfg(
+        cfg, data_root=data_root, runs_root=runs_root, sizing_factor=sizing_factor
+    )
 
 
 def main() -> None:
@@ -218,26 +259,42 @@ def main() -> None:
     parser.add_argument("--runs-root", type=Path, default=Path("runs/carry-engine-2026-10"))
     parser.add_argument("--out", type=Path, default=Path("data/carry_engine_oos.json"))
     parser.add_argument("--symbols", default=",".join(SYMBOLS))
+    parser.add_argument(
+        "--config-template", default="research-carry-engine-{stem}.yaml",
+        help="config file name pattern under configs/ ({stem} = symbol without USDT)",
+    )
+    parser.add_argument(
+        "--sizing-factor", type=float, default=1.0,
+        help="sizing multiplier of the validated hedge quantity (brief 014)",
+    )
     args = parser.parse_args()
 
     results: list[dict[str, Any]] = []
     for symbol in args.symbols.split(","):
         stem = symbol.strip().lower().removesuffix("usdt")
-        config_path = Path(f"configs/research-carry-engine-{stem}.yaml")
-        results.append(run_symbol(args.data_root, args.runs_root, config_path))
+        config_path = Path("configs") / args.config_template.format(stem=stem)
+        results.append(
+            run_symbol(
+                args.data_root, args.runs_root, config_path,
+                sizing_factor=args.sizing_factor,
+            )
+        )
 
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(json.dumps(results, indent=2, allow_nan=False), encoding="utf-8")
     for result in results:
         stats = result["oos"]["full"]
-        substats = result["oos"]["subperiods"]
+        substats = result["oos"].get("subperiods", {})
         subtext = " ".join(
             f"{name}={sub['total_return']:+.1%}" for name, sub in substats.items()
         )
-        print(f"\n{result['symbol']} combined OOS: "
+        tail = result["tail"]
+        print(f"\n{result['symbol']} combined OOS (F={result['sizing_factor']:g}): "
               f"total={stats['total_return']:+.2%} CAGR={stats['cagr']:+.2%} "
               f"NW-t={stats['t_stat_nw']} DD={stats['max_drawdown']:.2%}")
         print(f"  subperiods: {subtext}")
+        print(f"  tail year p05→p95: {tail['p05']:+.2%} … {tail['p95']:+.2%} "
+              f"(median {tail['median']:+.2%})")
         print(f"  equity: {result['combined_equity_start_usdt']:.0f} → "
               f"{result['combined_equity_end_usdt']:.0f} USDT")
     print(f"written: {args.out}")

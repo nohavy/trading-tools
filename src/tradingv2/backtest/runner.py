@@ -17,6 +17,7 @@ from tradingv2.data.instruments import InstrumentRules
 from tradingv2.execution.exchange import SimulatedExchange
 from tradingv2.metrics.compute import MetricsReport
 from tradingv2.portfolio.margin import MarginAccount
+from tradingv2.portfolio.margin_spot import MarginSpotAccount
 from tradingv2.portfolio.spot import SpotAccount
 from tradingv2.strategies.builtin import build_strategy
 
@@ -162,10 +163,18 @@ def run_backtest(
     bars = _load_bars(cfg, data_root, bar_bounds)
     tape = _load_tape(cfg, data_root)
 
-    account: MarginAccount | SpotAccount
+    account: MarginAccount | SpotAccount | MarginSpotAccount
     if cfg.account.type == "margin":
         account = MarginAccount(
             balance=cfg.account.balance, leverage=cfg.account.leverage, mmr=cfg.account.mmr
+        )
+    elif cfg.account.type == "margin_spot":
+        if cfg.account.borrow_apr_pct is None:
+            raise RunnerError("account borrow_apr_pct is required for a margin spot leg")
+        account = MarginSpotAccount(
+            balance=cfg.account.balance,
+            borrow_apr=cfg.account.borrow_apr_pct / 100.0,
+            mmr=cfg.account.mmr,
         )
     else:
         account = SpotAccount(quote_balance=cfg.account.balance)
