@@ -152,6 +152,7 @@ def run_backtest(
     runs_root: Path,
     *,
     bar_bounds: tuple[int, int] | None = None,
+    render: bool = True,
 ) -> Path:
     """Run one backtest from a config file; return the run directory.
 
@@ -214,7 +215,7 @@ def run_backtest(
         data_root,
         runs_root,
         metrics_json=metrics_to_json(metrics),
-        render=True,
+        render=render,
     )
 
 

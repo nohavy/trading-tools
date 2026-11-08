@@ -112,7 +112,12 @@ def _run_leg(
     with tempfile.TemporaryDirectory(prefix="tv2-carry-config-") as tmp:
         cfg_path = Path(tmp) / f"{symbol}-{leg_name}.yaml"
         cfg_path.write_text(yaml.safe_dump(tv2_cfg, sort_keys=False), encoding="utf-8")
-        return Path(run_backtest(cfg_path, data_root=data_root, runs_root=runs_root))
+        # no per-leg HTML: the aggregated results document reports the numbers
+        return Path(
+            run_backtest(
+                cfg_path, data_root=data_root, runs_root=runs_root, render=False
+            )
+        )
 
 
 def _leg_stats(run_dir: Path) -> dict[str, Any]:
