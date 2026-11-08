@@ -5,6 +5,9 @@
 symbol: ETHUSDT
 total_capital: 20000
 hedge_fraction: 0.95
+# Brief 014 (figés pré-exécution) : compte marge spot de la jambe long à F>1.
+spot_margin_mmr: 0.05
+borrow_apr_pct: 6.0
 # Entrée à la première clôture daily >= 2020-01-08 00:00 UTC, identique à
 # l'entrée de l'écran toujours couvert (décision à la clôture du 2020-01-07).
 trade_start_ns: 1578441600000000000

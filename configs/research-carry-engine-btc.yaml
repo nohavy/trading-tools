@@ -1,6 +1,9 @@
 symbol: BTCUSDT
 total_capital: 20000
 hedge_fraction: 0.95
+# Brief 014 (figés pré-exécution) : compte marge spot de la jambe long à F>1.
+spot_margin_mmr: 0.05
+borrow_apr_pct: 6.0
 # First OOS daily-close boundary: 2023-07-01 00:00 UTC.
 trade_start_ns: 1688169600000000000
 legs:
