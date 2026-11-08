@@ -28,6 +28,11 @@ walk-forward, holdout pré-enregistré) puis rejouée dans un moteur
 | — | Holdout pré-enregistré septembre 2026 (trend 60j) | **NO-GO** — équivalent à buy-and-hold, aucune valeur ajoutée |
 | 009 | Carry neutre spot/perp pré-enregistré | **Premier écran validé** (t 4-6, DD 0,2-0,6 %) mais le filtre de timing détruit la valeur ; **le toujours couvert** (+49,4 % OOS) devient le candidat |
 | 010 | Carry toujours couvert dans le moteur 1m | **Validé moteur** — t 7,20/6,04, DD 0,38/0,29 %, fidélité vectorielle établie, stress franchi, bear 2020-22 rejoué (+121 %/+341 % IS, corr ≥ 0,999) ; holdout pré-enregistré = prochaine étape |
+| — | Holdout pré-enregistré octobre 2026 (carry BTC/ETH) | **PASSED** — +0,08 %/+0,06 % net, jamais vu au préalable, empreintes paper enregistrées |
+| 011 | Mode paper (feed 1m sans clé, Engine streaming, session atomique, gate d'empreinte) | **Implémenté** (9/10 tâches) — `tv2 paper run/status/report`, holdout octobre rejoué par le gate |
+| 012 | Whale-flux on-chain BigQuery (20 hubs figés) | **NO-GO** — IS −81,5 %, DD 88,6 %, OOS −5 % (t −0,11) ; ingestion et hubs conservés comme héritage |
+| 013 | Extension du carry à 5 paires liquides (SOL/XRP/DOGE/ADA/BNB) | **Brief figé** (`docs/carry-multi-pairs-2026-11-brief.md`) — barre durcie t ≥ 2,58, écran daily, exécution en attente |
+| 014 | Carry levieré F ∈ {2 ; 3,5 ; 5} | **NO-GO à lettre figée** — solvabilité/LUNA/budgets PASS, t ≥ 3,27, mais cohérence ±15 % violée à chaque F ; le déficit = 100 % l'intérêt d'emprunt APR 6 % (identité vérifiée ≤ 2 bps) ; fork 014-b ouvert avant le holdout de décembre (`docs/carry-leverage-2026-11-result.md`) |
 
 ## Installation
 

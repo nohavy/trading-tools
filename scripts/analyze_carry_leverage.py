@@ -117,7 +117,8 @@ def analyze_result(
     ts_spot, eq_spot = _leg_equity_series(legs_by_leg["spot"])
     ts_perp, eq_perp = _leg_equity_series(legs_by_leg["perp"])
     ts, combined = _mod.combine_leg_equities(ts_spot, eq_spot, ts_perp, eq_perp)
-    keep = (ts >= oos_start_ns) & (ts <= oos_end_ns)
+    # engine convention: marks are [start, end) at midnight boundaries
+    keep = (ts >= oos_start_ns) & (ts < oos_end_ns)
     ts, combined = ts[keep], combined[keep]
 
     perp_marks = _daily_open_marks(data_root, "um", symbol)
@@ -131,7 +132,8 @@ def analyze_result(
     ratio_array = np.asarray(ratios) if ratios else np.asarray([float("nan")])
     joint_ratio_min = float(np.min(ratio_array))
     luna_mask = (ts >= _ns(LUNA_START)) & (ts <= _ns(LUNA_END))
-    luna_slice = combined[luna_mask] if luna_mask.any() else np.asarray([float("nan")])
+    luna_slice = combined[luna_mask]
+    luna_dd = _max_drawdown(luna_slice) if luna_slice.size >= 2 else None
 
     entry_qty, entry_price, entry_fee = _entry_cost(legs_by_leg["spot"])
     balance = _run_balance(legs_by_leg["spot"])
@@ -156,7 +158,7 @@ def analyze_result(
             if ratios
             else None
         ),
-        "luna_dd": _max_drawdown(luna_slice),
+        "luna_dd": luna_dd,
         "window_max_dd": _max_drawdown(combined),
         "spot_leg_min_equity": float(np.min(eq_spot)),
         "perp_leg_min_equity": float(np.min(eq_perp)),
